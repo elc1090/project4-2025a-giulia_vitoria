@@ -79,7 +79,7 @@ Etapas principais do projeto:
 ---
 ## Para rodar localmente 
 
-# Backend
+**Backend**
 - ls
 - cd backend
 - python3 -m venv venv
@@ -87,7 +87,7 @@ Etapas principais do projeto:
 - pip install -r requirements.txt
 - flas run
 
-  # Frontend
-  - cd frontend
-  - npm install
-  - npm start
+**Frontend**
+- cd frontend
+- npm install
+- npm start
