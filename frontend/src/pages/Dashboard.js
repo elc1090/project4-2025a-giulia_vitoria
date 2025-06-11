@@ -149,8 +149,10 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
       <Header onSearch={setSearchTerm} nomeUsuario={nomeUsuario} onLogout={onLogout} />
       <div style={styles.main}>
         <Sidebar
-          favorites={favorites}
-          folders={folders}        
+          folders={folders}
+          onCreateFolder={(newFolder) => setFolders(prev => [...prev, newFolder])}
+          onDeleteFolder={(id) => setFolders(prev => prev.filter(f => f.id !== id))}
+          onEditFolder={(id, name) => setFolders(prev => prev.map(f => f.id === id ? {...f, name} : f))}
         />
         <main style={styles.content}>
           <form onSubmit={handleAddLink} style={styles.form}>
@@ -158,7 +160,9 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
             <input type="url" placeholder="URL" value={newUrl} onChange={e => setNewUrl(e.target.value)} style={styles.input} required />
             <input type="text" placeholder="Descrição (opcional)" value={newDescription} onChange={e => setNewDescription(e.target.value)} style={styles.input} />
             {erro && <span style={styles.erro}>{erro}</span>}
-            <button type="submit" style={styles.button} disabled={isLoading}>{isLoading ? "Adicionando..." : "Adicionar Link"}</button>
+            <button type="submit" style={styles.button} disabled={isLoading}>
+              {isLoading ? <div style={styles.loader}></div> : "Adicionar Link"}
+            </button>
           </form>
 
           {editingLink && (
@@ -183,9 +187,6 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
               </div>
             </div>
           )}
-
-          {/* Removido modal de edição de pasta */}
-
           <LinkList links={filteredLinks} onEdit={handleEdit} onDelete={confirmDelete} grid />
         </main>
       </div>
@@ -202,5 +203,6 @@ const styles = {
   button: { padding: "10px 20px", borderRadius: "6px", backgroundColor: "#2c3e50", color: "#fff", border: "none", cursor: "pointer" },
   erro: { color: "red", fontSize: "14px" },
   modalOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center" },
-  modal: { backgroundColor: "#fff", padding: "20px", borderRadius: "8px", minWidth: "300px" }
+  modal: { backgroundColor: "#fff", padding: "20px", borderRadius: "8px", minWidth: "300px" },
+  loader: { width: "24px", height: "24px", border: "4px solid rgba(255, 255, 255, 0.3)", borderTop: "4px solid white", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto" }
 };

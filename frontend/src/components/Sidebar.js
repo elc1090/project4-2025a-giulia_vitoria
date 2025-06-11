@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function Sidebar({
   onCreateFolder = () => {},
@@ -13,26 +13,37 @@ export default function Sidebar({
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const user_id = localStorage.getItem("user_id");
 
-  // Estados para edição
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFolderId, setEditFolderId] = useState(null);
   const [editFolderName, setEditFolderName] = useState('');
 
-  // Estados para exclusão
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteFolderId, setDeleteFolderId] = useState(null);
   const [deleteFolderName, setDeleteFolderName] = useState('');
 
-  // Menus de opções nas pastas
   const [showMenus, setShowMenus] = useState({});
 
-  // Hover para folder e itens do menu
   const [hoveredFolderId, setHoveredFolderId] = useState(null);
   const [hoveredMenuItem, setHoveredMenuItem] = useState({ folderId: null, item: null });
 
-  const API_URL = process.env.REACT_APP_API_URL || 'https://project3-2025a-giulia-vitoria.onrender.com';
+const API_URL = 'http://localhost:5000';
 
-  // Abrir modal excluir
+useEffect(() => {
+  const fetchFolders = async () => {
+    if (!user_id) return;
+
+    try {
+      const res = await fetch(`${API_URL}/folders?user_id=${user_id}`);
+      const data = await res.json();
+      onCreateFolder(data); // ou setFolders(data) se usar estado local
+    } catch (err) {
+      console.error("Erro ao carregar pastas:", err);
+    }
+  };
+
+  fetchFolders();
+}, []);
+
   const openDeleteModal = (folder) => {
     setDeleteFolderId(folder.id);
     setDeleteFolderName(folder.name);
@@ -62,8 +73,6 @@ export default function Sidebar({
     }
   };
 
-
-  // Abrir modal editar
   const openEditModal = (folder) => {
     setEditFolderId(folder.id);
     setEditFolderName(folder.name);
@@ -109,15 +118,18 @@ export default function Sidebar({
     setShowMenus(prev => ({ ...prev, [id]: false }));
   };
 
-  // Seleciona/deseleciona pasta
   const handleFolderClick = (id) => {
     setSelectedFolder(id === selectedFolder ? null : id);
   };
 
-  // Criar pasta nova
   const handleCreateFolder = async () => {
     if (!folderName.trim()) {
       alert("Nome da pasta é obrigatório!");
+      return;
+    }
+
+    if (!user_id) {
+      alert('Usuário não identificado. Faça login novamente.');
       return;
     }
 
@@ -135,9 +147,14 @@ export default function Sidebar({
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Erro ao criar pasta");
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('Erro ao criar pasta:', text);
+        throw new Error("Erro ao criar pasta");
+      }
 
       const data = await res.json();
+      console.log('Pasta criada com sucesso:', data);
 
       const newFolder = {
         id: data.id,
@@ -172,7 +189,7 @@ export default function Sidebar({
           style={{ ...styles.button, backgroundColor: "#2c3e50" }}
           disabled={isCreatingFolder}
         >
-          {isCreatingFolder ? 'Criando...' : 'Criar'}
+          {isCreatingFolder ? <div style={styles.loader}></div> : 'Criar'}
         </button>
       </div>
 
@@ -416,4 +433,13 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
   },
+  loader: { 
+    width: "24px", 
+    height: "24px", 
+    border: "4px solid rgba(255, 255, 255, 0.3)", 
+    borderTop: "4px solid white", 
+    borderRadius: "50%", 
+    animation: "spin 1s linear infinite", 
+    margin: "0 auto"
+  }
 };
