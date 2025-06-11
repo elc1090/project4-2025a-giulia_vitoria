@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 
 export default function Sidebar({
-  onCreateFolder = [],
-  folders =[],
-  setSelectedFolder = [],
-  selectedFolder = [],
-  onEditFolder = [],
-  onDeleteFolder = []
+  onCreateFolder = () => {},
+  folders = [],
+  setSelectedFolder = () => {},
+  selectedFolder = null,
+  onEditFolder = () => {},
+  onDeleteFolder = () => {}
 }) {
+
   const [folderName, setFolderName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const user_id = localStorage.getItem("user_id");
@@ -97,8 +98,6 @@ export default function Sidebar({
     }
   };
 
-
-  // Toggle menu vertical (três pontos)
   const toggleMenu = (folderId) => {
     setShowMenus((prev) => ({
       ...prev,

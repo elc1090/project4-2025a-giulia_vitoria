@@ -30,51 +30,74 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
   const [deleteFolderId, setDeleteFolderId] = useState(null);
 
   const user_id = localStorage.getItem("user_id");
-  const API_URL = process.env.REACT_APP_API_URL || 'https://project3-2025a-giulia-vitoria.onrender.com';
+  const API_URL = 'http://localhost:5000';
 
-  const handleCreateFolder = (folderName) => {
-    if (!folderName) return;
-    const payload = { name: folderName, user_id: parseInt(user_id) };
-    fetch(`${API_URL}/folders`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.erro) {
-          alert(`Erro ao criar pasta: ${data.erro}`);
-        } else {
-          setFolders(prev => [...prev, { id: data.id, name: folderName }]);
-        }
-      })
-      .catch(err => console.error('Erro ao criar pasta:', err));
+  async function handleCreateFolder(name) {
+    if (typeof name !== "string" || !name.trim()) return;
+
+    try {
+      const res = await fetch(`${API_URL}/folders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), user_id: parseInt(user_id) }),
+      });
+
+      if (!res.ok) throw new Error("Erro ao criar pasta");
+
+      // Aguarda um breve momento e chama fetchFolders para garantir a atualização
+      await fetchFolders(user_id);
+
+    } catch (error) {
+      console.error(error.message);
+    }
+  }
+
+  async function fetchFolders(user_id) {
+    const response = await fetch(`${API_URL}/folders?user_id=${user_id}`);
+    const folders = await response.json();
+    setFolders(folders);
+  }
+
+  const handleEditFolder = (folderId, newName) => {
+    setFolders(prevFolders =>
+      prevFolders.map(folder =>
+        folder.id === folderId ? { ...folder, name: newName } : folder
+      )
+    );
   };
 
-  const handleEditFolder = (folderId, currentName) => {
-    setEditFolderData({ id: folderId, name: currentName });
-    setShowEditFolderModal(true);
-  };
+  const confirmEditFolder = async () => {
+    if (!editFolderData.id || !editFolderData.name.trim()) return;
 
-  const confirmEditFolder = () => {
-    fetch(`${API_URL}/folders/${editFolderData.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editFolderData.name }),
-    })
-      .then(res => res.json())
-      .then(() => {
-        setFolders(prev => prev.map(f => f.id === editFolderData.id ? { ...f, name: editFolderData.name } : f));
-        setShowEditFolderModal(false);
-      })
-      .catch(err => console.error("Erro ao editar pasta:", err));
+    try {
+      const res = await fetch(`${API_URL}/folders/${editFolderData.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ name: editFolderData.name })
+      });
+
+      if (!res.ok) throw new Error("Erro ao editar pasta");
+
+      // Atualiza a lista de pastas localmente
+      setFolders(prevFolders =>
+        prevFolders.map(folder =>
+          folder.id === editFolderData.id
+            ? { ...folder, name: editFolderData.name }
+            : folder
+        )
+      );
+
+      setShowEditFolderModal(false);
+    } catch (error) {
+      console.error("Erro ao editar pasta:", error.message);
+    }
   };
 
   const handleDeleteFolder = (folderId) => {
-    setFolders(prev => prev.filter(f => f.id !== folderId));
-    if (selectedFolder === folderId) {
-      setSelectedFolder(null);
-    }
+    setDeleteFolderId(folderId);
+    setShowDeleteFolderModal(true);
   };
 
   const confirmDeleteFolder = () => {
@@ -90,11 +113,8 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
 
   useEffect(() => {
     if (!user_id) return;
-    fetch(`${API_URL}/folders?user_id=${user_id}`)
-      .then(res => res.json())
-      .then(data => setFolders(data))
-      .catch(err => console.error('Erro ao carregar pastas:', err));
-  }, [user_id, API_URL]);
+    fetchFolders(user_id);
+  }, [user_id]);
 
   useEffect(() => {
     if (!user_id) return;
@@ -112,9 +132,12 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
         setLinks(formattedLinks);
       })
       .catch(err => console.error("Erro ao carregar links:", err));
-  }, [user_id, API_URL, selectedFolder]);
+  }, [user_id, selectedFolder]);
 
-  const filteredLinks = links.filter(link => link.title && link.title.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredLinks = links.filter(link => 
+    (link.title && link.title.toLowerCase().includes(searchTerm.toLowerCase())) || 
+    (link.description && link.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   const handleAddLink = async (e) => {
     e.preventDefault();
@@ -163,18 +186,24 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
     e.preventDefault();
     setErro("");
     setIsSaving(true);
-    await fetch(`${API_URL}/bookmarks/${editingLink.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        titulo: editingLink.titulo,
-        url: editingLink.url,
-        descricao: editingLink.descricao,
-      }),
-    });
-    setLinks(links.map(l => (l.id === editingLink.id ? { ...l, title: editingLink.titulo, url: editingLink.url, description: editingLink.descricao } : l)));
-    setEditingLink(null);
-    setIsSaving(false);
+    try {
+      const res = await fetch(`${API_URL}/bookmarks/${editingLink.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          titulo: editingLink.titulo,
+          url: editingLink.url,
+          descricao: editingLink.descricao,
+        }),
+      });
+      if (!res.ok) throw new Error("Erro ao salvar link");
+      setLinks(links.map(l => (l.id === editingLink.id ? { ...l, title: editingLink.titulo, url: editingLink.url, description: editingLink.descricao } : l)));
+      setEditingLink(null);
+    } catch (error) {
+      setErro(error.message);
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   const handleDelete = async (id) => {
@@ -237,7 +266,6 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
             </div>
           )}
 
-          {/* Modal Edit Folder */}
           {showEditFolderModal && (
             <div style={styles.modalOverlay}>
               <div style={styles.modal}>
@@ -251,7 +279,6 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
             </div>
           )}
 
-          {/* Modal Delete Folder */}
           {showDeleteFolderModal && (
             <div style={styles.modalOverlay}>
               <div style={styles.modal}>
@@ -275,52 +302,10 @@ const styles = {
   container: { height: "100vh", display: "flex", flexDirection: "column" },
   main: { flex: 1, display: "flex" },
   content: { flex: 1, padding: "20px", background: "#e9ebee", overflowY: "auto" },
-  form: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "10px",
-    marginBottom: "20px",
-    alignItems: "center",
-  },
-  input: {
-    flex: "1 1 150px",
-    padding: "10px",
-    borderRadius: "6px",
-    border: "1px solid #ccc",
-    fontSize: "14px",
-    minWidth: "150px",
-  },
-  button: {
-    padding: "10px 18px",
-    backgroundColor: "#2c3e50",
-    color: "white",
-    border: "none",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontWeight: "bold",
-  },
-  erro: {
-    color: "red",
-    fontSize: "12px",
-  },
-  modalOverlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    width: "100vw",
-    height: "100vh",
-    backgroundColor: "rgba(0,0,0,0.5)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1000,
-  },
-  modal: {
-    background: "#fff",
-    padding: "20px",
-    borderRadius: "8px",
-    boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-    minWidth: "300px",
-    textAlign: "center",
-  },
+  form: { display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "20px", alignItems: "center" },
+  input: { flex: "1 1 150px", padding: "10px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "14px", minWidth: "150px" },
+  button: { padding: "10px 18px", backgroundColor: "#2c3e50", color: "white", border: "none", borderRadius: "6px", cursor: "pointer" },
+  erro: { color: "red", fontSize: "13px", marginLeft: "10px" },
+  modalOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0, 0, 0, 0.3)", display: "flex", justifyContent: "center", alignItems: "center" },
+  modal: { backgroundColor: "white", padding: "20px", borderRadius: "8px", boxShadow: "0 2px 10px rgba(0,0,0,0.2)", minWidth: "300px" },
 };
