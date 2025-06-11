@@ -1,11 +1,11 @@
-# 🌐 Projeto: Aplicação Web de Compartilhamento de Links Favoritos
+# Projeto: Aplicação Web de Compartilhamento de Links Favoritos
 
 Uma aplicação fullstack que permite aos usuários cadastrados compartilhar, visualizar, editar e remover seus links favoritos. Os dados são armazenados no servidor e associados a usuários pré-definidos.
 
 ![image](https://github.com/user-attachments/assets/6a1438af-1460-4a0f-8f93-c1e66c952607)
 
 
-## 🔗 Acesso
+## Acesso
 
 - **Frontend:** https://front-bookmark.vercel.app
 - Para acessar, você pode criar um novo usuário, ou fazer login com algum já existente
@@ -13,7 +13,7 @@ Uma aplicação fullstack que permite aos usuários cadastrados compartilhar, vi
 
 ---
 
-## 📦 Plataformas de Hospedagem
+## Plataformas de Hospedagem
 
 - **Frontend:** [Vercel](https://vercel.com/home)  
 - **Backend:** [Render](https://render.com/)  
@@ -21,14 +21,14 @@ Uma aplicação fullstack que permite aos usuários cadastrados compartilhar, vi
 
 ---
 
-## 👩‍💻 Desenvolvedoras
+## Desenvolvedoras
 
 - **Vitória Luiza Camara** – Sistemas de Informação / UFSM  
 - **Giulia Rodrigues de Araújo** – Ciência da Computação / UFSM
 
 ---
 
-## 💡 Sobre o Produto
+## Sobre o Produto
 
 Aplicação web com autenticação simplificada que oferece:
 
@@ -39,7 +39,7 @@ Aplicação web com autenticação simplificada que oferece:
 
 ---
 
-## 🔧 Desenvolvimento
+## Desenvolvimento
 
 Etapas principais do projeto:
 
@@ -55,7 +55,7 @@ Etapas principais do projeto:
 
 ---
 
-## 🚀 Tecnologias Utilizadas
+## Tecnologias Utilizadas
 
 - **Frontend:** React.js (HTML, CSS, JavaScript)  
 - **Backend:** Python (Flask) + PostgreSQL  
@@ -69,7 +69,25 @@ Etapas principais do projeto:
 - Atualizar a lista de folders ao criar um novo
 - Implementar um spinner ao carregar a página
 
+---
+
 ## Repositório FrontEnd
 
 - Optamos por separar o front e o back em diferentes repositórios a fim de facilitar o deploy do projeto. 
 - Repositório do [FrontEnd](https://github.com/iamvitoria/Front-Bookmark.git)
+
+---
+## Para rodar localmente 
+
+# Backend
+- ls
+- cd backend
+- python3 -m venv venv
+- venv\Scripts\activate
+- pip install -r requirements.txt
+- flas run
+
+  # Frontend
+  - cd frontend
+  - npm install
+  - npm start
