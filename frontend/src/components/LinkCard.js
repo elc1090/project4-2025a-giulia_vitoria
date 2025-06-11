@@ -15,7 +15,6 @@ export default function LinkCard({ link, onEdit, onDelete, onAdd }) {
           <ul style={styles.menu}>
             <li onClick={() => { setMenuOpen(false); onEdit(link); }} style={styles.menuItem}>Editar</li>
             <li onClick={() => { setMenuOpen(false); onDelete(link.id); }} style={styles.menuItem}>Excluir</li>
-            <li onClick={() => { setMenuOpen(false); onAdd(link.id); }} style={styles.menuItem}>Adicionar à pasta</li>
           </ul>
         )}
       </div>

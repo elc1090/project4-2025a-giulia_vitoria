@@ -20,96 +20,21 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
-  const [selectedFolder, setSelectedFolder] = useState(null);
-  const [folders, setFolders] = useState([]);
-
-  const [showEditFolderModal, setShowEditFolderModal] = useState(false);
-  const [editFolderData, setEditFolderData] = useState({ id: null, name: '' });
-
-  const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
-  const [deleteFolderId, setDeleteFolderId] = useState(null);
-
   const user_id = localStorage.getItem("user_id");
   const API_URL = 'http://localhost:5000';
 
-  async function handleCreateFolder(name) {
-    if (typeof name !== "string" || !name.trim()) return;
+  const [folders, setFolders] = useState([]);
 
+  async function fetchFolders(user_id) {
     try {
-      const res = await fetch(`${API_URL}/folders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), user_id: parseInt(user_id) }),
-      });
-
-      if (!res.ok) throw new Error("Erro ao criar pasta");
-
-      // Aguarda um breve momento e chama fetchFolders para garantir a atualização
-      await fetchFolders(user_id);
-
+      const response = await fetch(`${API_URL}/folders?user_id=${user_id}`);
+      if (!response.ok) throw new Error("Erro ao buscar pastas");
+      const folders = await response.json();
+      setFolders(folders);
     } catch (error) {
       console.error(error.message);
     }
   }
-
-  async function fetchFolders(user_id) {
-    const response = await fetch(`${API_URL}/folders?user_id=${user_id}`);
-    const folders = await response.json();
-    setFolders(folders);
-  }
-
-  const handleEditFolder = (folderId, newName) => {
-    setFolders(prevFolders =>
-      prevFolders.map(folder =>
-        folder.id === folderId ? { ...folder, name: newName } : folder
-      )
-    );
-  };
-
-  const confirmEditFolder = async () => {
-    if (!editFolderData.id || !editFolderData.name.trim()) return;
-
-    try {
-      const res = await fetch(`${API_URL}/folders/${editFolderData.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ name: editFolderData.name })
-      });
-
-      if (!res.ok) throw new Error("Erro ao editar pasta");
-
-      // Atualiza a lista de pastas localmente
-      setFolders(prevFolders =>
-        prevFolders.map(folder =>
-          folder.id === editFolderData.id
-            ? { ...folder, name: editFolderData.name }
-            : folder
-        )
-      );
-
-      setShowEditFolderModal(false);
-    } catch (error) {
-      console.error("Erro ao editar pasta:", error.message);
-    }
-  };
-
-  const handleDeleteFolder = (folderId) => {
-    setDeleteFolderId(folderId);
-    setShowDeleteFolderModal(true);
-  };
-
-  const confirmDeleteFolder = () => {
-    fetch(`${API_URL}/folders/${deleteFolderId}`, { method: "DELETE" })
-      .then(res => res.json())
-      .then(() => {
-        setFolders(prev => prev.filter(f => f.id !== deleteFolderId));
-        if (selectedFolder === deleteFolderId) setSelectedFolder(null);
-        setShowDeleteFolderModal(false);
-      })
-      .catch(err => console.error("Erro ao excluir pasta:", err));
-  };
 
   useEffect(() => {
     if (!user_id) return;
@@ -119,7 +44,6 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
   useEffect(() => {
     if (!user_id) return;
     let url = `${API_URL}/bookmarks?user_id=${user_id}`;
-    if (selectedFolder) url += `&folder_id=${selectedFolder}`;
     fetch(url)
       .then(res => res.json())
       .then(data => {
@@ -132,7 +56,7 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
         setLinks(formattedLinks);
       })
       .catch(err => console.error("Erro ao carregar links:", err));
-  }, [user_id, selectedFolder]);
+  }, [user_id]);
 
   const filteredLinks = links.filter(link => 
     (link.title && link.title.toLowerCase().includes(searchTerm.toLowerCase())) || 
@@ -153,7 +77,6 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
       titulo: newTitle,
       url: newUrl,
       descricao: newDescription,
-      folder_id: selectedFolder
     };
     try {
       const res = await fetch(`${API_URL}/bookmarks`, {
@@ -227,12 +150,7 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
       <div style={styles.main}>
         <Sidebar
           favorites={favorites}
-          onCreateFolder={handleCreateFolder}
-          folders={folders}
-          setSelectedFolder={setSelectedFolder}
-          selectedFolder={selectedFolder}
-          onEditFolder={handleEditFolder}
-          onDeleteFolder={handleDeleteFolder}
+          folders={folders}        
         />
         <main style={styles.content}>
           <form onSubmit={handleAddLink} style={styles.form}>
@@ -266,30 +184,7 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
             </div>
           )}
 
-          {showEditFolderModal && (
-            <div style={styles.modalOverlay}>
-              <div style={styles.modal}>
-                <h3>Editar Pasta</h3>
-                <input type="text" value={editFolderData.name} onChange={(e) => setEditFolderData({ ...editFolderData, name: e.target.value })} style={styles.input} />
-                <div style={{ marginTop: '10px' }}>
-                  <button onClick={confirmEditFolder} style={styles.button}>Salvar</button>
-                  <button onClick={() => setShowEditFolderModal(false)} style={{ ...styles.button, backgroundColor: "gray" }}>Cancelar</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {showDeleteFolderModal && (
-            <div style={styles.modalOverlay}>
-              <div style={styles.modal}>
-                <p>Tem certeza que deseja excluir esta pasta?</p>
-                <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                  <button onClick={confirmDeleteFolder} style={{ ...styles.button, backgroundColor: "#2c3e50" }}>Sim, excluir</button>
-                  <button onClick={() => setShowDeleteFolderModal(false)} style={{ ...styles.button, backgroundColor: "gray" }}>Cancelar</button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Removido modal de edição de pasta */}
 
           <LinkList links={filteredLinks} onEdit={handleEdit} onDelete={confirmDelete} grid />
         </main>
@@ -304,8 +199,8 @@ const styles = {
   content: { flex: 1, padding: "20px", background: "#e9ebee", overflowY: "auto" },
   form: { display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "20px", alignItems: "center" },
   input: { flex: "1 1 150px", padding: "10px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "14px", minWidth: "150px" },
-  button: { padding: "10px 18px", backgroundColor: "#2c3e50", color: "white", border: "none", borderRadius: "6px", cursor: "pointer" },
-  erro: { color: "red", fontSize: "13px", marginLeft: "10px" },
-  modalOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0, 0, 0, 0.3)", display: "flex", justifyContent: "center", alignItems: "center" },
-  modal: { backgroundColor: "white", padding: "20px", borderRadius: "8px", boxShadow: "0 2px 10px rgba(0,0,0,0.2)", minWidth: "300px" },
+  button: { padding: "10px 20px", borderRadius: "6px", backgroundColor: "#2c3e50", color: "#fff", border: "none", cursor: "pointer" },
+  erro: { color: "red", fontSize: "14px" },
+  modalOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center" },
+  modal: { backgroundColor: "#fff", padding: "20px", borderRadius: "8px", minWidth: "300px" }
 };

@@ -62,7 +62,7 @@ function LoginForm({ onLogin }) {
       {erro && <span style={styles.erro}>{erro}</span>}
       
       <button type="submit" style={styles.button} disabled={isLoading}>
-        {isLoading ? "Carregando..." : "Entrar"}
+        {isLoading ? <div style={styles.loader}></div> : "Entrar"}
       </button>
     </form>
   );
@@ -96,11 +96,14 @@ const styles = {
     fontSize: "14px",
   },
   loader: {
-    marginTop: "10px",
-    textAlign: "center",
-    fontSize: "14px",
-    color: "#2c3e50",
-  },
+    width: "24px",
+    height: "24px",
+    border: "4px solid rgba(255, 255, 255, 0.3)",
+    borderTop: "4px solid white",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+    margin: "0 auto",
+  }
 };
 
 export default LoginForm;
