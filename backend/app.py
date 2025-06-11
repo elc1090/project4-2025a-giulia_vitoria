@@ -250,5 +250,5 @@ def deletar_pasta(folder_id):
     return jsonify({'msg': 'Pasta deletada com sucesso'})
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # usa a porta fornecida pelo Render ou 5000 localmente
+    port = int(os.environ.get("PORT", 5000)) 
     app.run(host="0.0.0.0", port=port, debug=True)

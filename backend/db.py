@@ -10,8 +10,10 @@ def get_connection():
     try:
         database_url = os.getenv("DATABASE_URL")
         if database_url:
+            print(f"[INFO] Conectando via DATABASE_URL...")
             conn = psycopg2.connect(database_url)
         else:
+            print(f"[INFO] Conectando via variáveis separadas (host, user, dbname)...")
             conn = psycopg2.connect(
                 host=os.getenv("DB_HOST"),
                 dbname=os.getenv("DB_NAME"),
@@ -21,7 +23,7 @@ def get_connection():
             )
         return conn
     except Exception as e:
-        print(f"Erro ao conectar ao banco de dados: {e}")
+        print(f"[ERRO] Erro ao conectar ao banco de dados: {e}")
         return None
 
 def create_user(username, email, password):
