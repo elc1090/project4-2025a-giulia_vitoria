@@ -183,7 +183,9 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
               <div style={styles.modal}>
                 <p>Tem certeza que deseja excluir este link?</p>
                 <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                  <button onClick={() => handleDelete(confirmDeleteId)} style={{ ...styles.button, backgroundColor: "#2c3e50" }}>{deletingId === confirmDeleteId ? "Excluindo..." : "Sim, excluir"}</button>
+                  <button onClick={() => handleDelete(confirmDeleteId)} style={{ ...styles.button, backgroundColor: "#2c3e50" }}>
+                    {deletingId === confirmDeleteId ? <div style={styles.loader}></div> : "Sim, excluir"}
+                    </button>
                   <button onClick={() => { setShowConfirm(false); setConfirmDeleteId(null); }} style={{ ...styles.button, backgroundColor: "gray" }}>Cancelar</button>
                 </div>
               </div>
