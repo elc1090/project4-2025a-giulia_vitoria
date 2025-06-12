@@ -1,62 +1,84 @@
-import React, { useState, useEffect } from 'react';
-import Dashboard from './pages/Dashboard';
-import Auth from './pages/Auth';
+import React, { useState, useEffect } from "react";
+import Dashboard from "./pages/Dashboard";
+import Auth from "./pages/Auth";
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [nomeUsuario, setNomeUsuario] = useState('');
+  const [nomeUsuario, setNomeUsuario] = useState("");
+  const [loadingOAuth, setLoadingOAuth] = useState(false);
+  const [erroOAuth, setErroOAuth] = useState("");
 
   // Função para login normal
   const handleLogin = (nome) => {
     setNomeUsuario(nome);
     setIsLoggedIn(true);
-    localStorage.setItem('nomeUsuario', nome);
+    localStorage.setItem("nomeUsuario", nome);
   };
 
   // Logout
   const handleLogout = () => {
     setIsLoggedIn(false);
-    setNomeUsuario('');
-    localStorage.removeItem('nomeUsuario');
+    setNomeUsuario("");
+    localStorage.removeItem("nomeUsuario");
   };
 
   useEffect(() => {
-    // Tenta restaurar sessão
-    const savedNomeUsuario = localStorage.getItem('nomeUsuario');
+    const savedNomeUsuario = localStorage.getItem("nomeUsuario");
     if (savedNomeUsuario) {
       setNomeUsuario(savedNomeUsuario);
       setIsLoggedIn(true);
       return;
     }
 
-    // Detecta retorno do OAuth do GitHub (exemplo: ?code=algumcodigo)
     const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
+    const username = urlParams.get("username");
+    const userId = urlParams.get("user_id");
 
+    if (username && userId) {
+      setNomeUsuario(username);
+      setIsLoggedIn(true);
+      localStorage.setItem("nomeUsuario", username);
+      localStorage.setItem("user_id", userId);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    const code = urlParams.get("code");
     if (code) {
-      // Trocar o código pelo token e dados do usuário via backend
       async function fetchGitHubUser() {
+        setLoadingOAuth(true); // <<< usando
+        setErroOAuth(""); // <<< limpando erro anterior
         try {
           const API_URL = process.env.REACT_APP_API_URL;
           const response = await fetch(`${API_URL}/github/callback?code=${code}`);
           const data = await response.json();
           if (response.ok && data.username) {
-            handleLogin(data.username);
-            // Limpa a URL para não ficar o ?code= na barra
+            setNomeUsuario(data.username);
+            setIsLoggedIn(true);
+            localStorage.setItem("nomeUsuario", data.username);
+            localStorage.setItem("user_id", data.user_id);
             window.history.replaceState({}, document.title, '/');
           } else {
-            console.error('Falha no login via GitHub');
+            setErroOAuth("Falha no login via GitHub"); // <<< usando
           }
         } catch (error) {
-          console.error('Erro no fetch GitHub callback:', error);
+          setErroOAuth("Erro ao conectar ao servidor"); // <<< usando
+        } finally {
+          setLoadingOAuth(false); // <<< usando
         }
       }
       fetchGitHubUser();
     }
   }, []);
 
+  if (loadingOAuth) {
+    return <p>Autenticando via GitHub...</p>;
+  }
+
   return (
     <>
+      {erroOAuth && <p style={{ color: "red" }}>{erroOAuth}</p>}
+
       {isLoggedIn ? (
         <Dashboard onLogout={handleLogout} nomeUsuario={nomeUsuario} />
       ) : (
