@@ -171,7 +171,9 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
               <input type="url" value={editingLink.url} onChange={e => setEditingLink({ ...editingLink, url: e.target.value })} style={styles.input} required />
               <input type="text" value={editingLink.descricao || ""} onChange={e => setEditingLink({ ...editingLink, descricao: e.target.value })} style={styles.input} />
               {erro && <span style={styles.erro}>{erro}</span>}
-              <button type="submit" style={styles.button} disabled={isSaving}>{isSaving ? "Salvando..." : "Salvar"}</button>
+              <button type="submit" style={styles.button} disabled={isSaving}>
+                {isSaving ? <div style={styles.loader}></div> : "Salvar"}
+                </button>
               <button type="button" onClick={() => setEditingLink(null)} style={{ ...styles.button, backgroundColor: "gray" }}>Cancelar</button>
             </form>
           )}
