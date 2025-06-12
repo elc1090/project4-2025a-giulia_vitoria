@@ -3,14 +3,20 @@ from flask_dance.contrib.github import make_github_blueprint, github
 from flask_cors import CORS
 from db import get_connection
 from dotenv import load_dotenv
+from urllib.parse import urlencode
 import os
 import bcrypt
+from functools import wraps
 
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "chave_secreta")
-CORS(app, supports_credentials=True)
+
+# Frontend URL para CORS e redirecionamento após login
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": FRONTEND_URL}})
 
 # Blueprint de autenticação com GitHub
 github_bp = make_github_blueprint(
@@ -19,21 +25,61 @@ github_bp = make_github_blueprint(
 )
 app.register_blueprint(github_bp, url_prefix="/login")
 
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify({"erro": "Usuário não autenticado"}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route("/github")
 def github_login():
     if not github.authorized:
         return redirect(url_for("github.login"))
+
     resp = github.get("/user")
     if not resp.ok:
-        return jsonify(error="Failed to fetch user info"), 500
+        return jsonify(error="Falha ao obter dados do GitHub"), 500
 
     github_info = resp.json()
     username = github_info["login"]
-    session["github_user"] = username
 
-    return redirect("/bem-vindo")
+    user_id = find_or_create_github_user(username)
+    session["github_user"] = username
+    session["user_id"] = user_id
+
+    query = urlencode({"username": username, "user_id": user_id})
+    # Redireciona para /dashboard do frontend, enviando username e user_id
+    return redirect(f"{FRONTEND_URL}/dashboard?{query}")
+
+def find_or_create_github_user(username):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE username = %s", (username,))
+    user = cur.fetchone()
+    if user:
+        cur.close()
+        conn.close()
+        return user[0]
+    # Insere usuário GitHub com email fake e senha vazia
+    cur.execute(
+        "INSERT INTO users (username, email, password_hash) VALUES (%s, %s, %s) RETURNING id",
+        (username, f"{username}@github.com", ""),
+    )
+    new_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return new_id
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return jsonify({"msg": "Logout efetuado"})
 
 @app.route("/bem-vindo")
+@login_required
 def bem_vindo():
     return f"<h1>Olá, {session.get('github_user', 'usuário')}! Login com GitHub feito com sucesso.</h1>"
 
@@ -82,8 +128,15 @@ def cadastrar_usuario():
     username = data.get('username')
     email = data.get('email')
     password = data.get('password')
-    if not username or not email or not password:
-        return jsonify({"erro": "Dados incompletos"}), 400
+    faltando = []
+    if not username:
+        faltando.append("username")
+    if not email:
+        faltando.append("email")
+    if not password:
+        faltando.append("password")
+    if faltando:
+        return jsonify({"erro": f"Campos faltando: {', '.join(faltando)}"}), 400
     success, msg = create_user(username, email, password)
     if success:
         return jsonify({"msg": msg}), 201
@@ -95,6 +148,9 @@ def login():
     data = request.get_json()
     email = data.get("email")
     password = data.get("password")
+    if not email or not password:
+        return jsonify({"erro": "Email e senha são obrigatórios"}), 400
+
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("SELECT id, username, email, password_hash FROM users WHERE email = %s", (email,))
@@ -105,6 +161,8 @@ def login():
         return jsonify({"erro": "Usuário não encontrado"}), 401
     stored_hash = user[3]
     if stored_hash and bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8')):
+        session["user_id"] = user[0]
+        session["username"] = user[1]
         return jsonify({
             "msg": "Login bem-sucedido",
             "user_id": user[0],
@@ -113,8 +171,9 @@ def login():
     return jsonify({"erro": "Credenciais inválidas"}), 401
 
 @app.route("/bookmarks", methods=["GET"])
+@login_required
 def listar_bookmarks():
-    user_id = request.args.get("user_id")
+    user_id = request.args.get("user_id") or session.get("user_id")
     folder_id = request.args.get("folder_id")
     if not user_id:
         return jsonify({"erro": "user_id não fornecido"}), 400
@@ -144,12 +203,13 @@ def listar_bookmarks():
     return jsonify(bookmarks)
 
 @app.route("/bookmarks", methods=["POST"])
+@login_required
 def criar_bookmark():
     data = request.json
     titulo = data.get('titulo')
     url = data.get('url')
     descricao = data.get('descricao')
-    user_id = data.get('user_id')
+    user_id = data.get('user_id') or session.get("user_id")
     folder_id = data.get('folder_id')
     if not titulo or not url or not user_id:
         return jsonify({'erro': 'Campos obrigatórios faltando'}), 400
@@ -167,6 +227,7 @@ def criar_bookmark():
     return jsonify({'id': novo_id}), 201
 
 @app.route("/bookmarks/<int:id>", methods=["PUT"])
+@login_required
 def atualizar_bookmark(id):
     data = request.get_json()
     conn = get_connection()
@@ -182,6 +243,7 @@ def atualizar_bookmark(id):
     return jsonify({"msg": "Atualizado com sucesso"})
 
 @app.route("/bookmarks/<int:id>", methods=["DELETE"])
+@login_required
 def deletar_bookmark(id):
     conn = get_connection()
     cur = conn.cursor()
@@ -192,8 +254,9 @@ def deletar_bookmark(id):
     return jsonify({"msg": "Deletado com sucesso"})
 
 @app.route("/folders", methods=["GET"])
+@login_required
 def listar_folders():
-    user_id = request.args.get("user_id")
+    user_id = request.args.get("user_id") or session.get("user_id")
     if not user_id:
         return jsonify({'erro': 'user_id não fornecido'}), 400
     conn = get_connection()
@@ -206,10 +269,11 @@ def listar_folders():
     return jsonify(folders)
 
 @app.route("/folders", methods=["POST"])
+@login_required
 def criar_folder():
     data = request.get_json()
     name = data.get("name")
-    user_id = data.get("user_id")
+    user_id = data.get("user_id") or session.get("user_id")
     if not name or not user_id:
         return jsonify({'erro': 'Campos obrigatórios faltando'}), 400
     conn = get_connection()
@@ -221,30 +285,31 @@ def criar_folder():
     conn.close()
     return jsonify({'id': novo_id}), 201
 
-@app.route("/folders/<int:folder_id>", methods=["PUT"])
-def atualizar_pasta(folder_id):
+@app.route("/folders/<int:id>", methods=["PUT"])
+@login_required
+def atualizar_folder(id):
     data = request.get_json()
-    novo_nome = data.get("name")
-    if not novo_nome:
+    name = data.get("name")
+    if not name:
         return jsonify({'erro': 'Nome é obrigatório'}), 400
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("UPDATE folders SET name = %s WHERE id = %s", (novo_nome, folder_id))
+    cur.execute("UPDATE folders SET name = %s WHERE id = %s", (name, id))
     conn.commit()
     cur.close()
     conn.close()
-    return jsonify({'msg': 'Pasta atualizada com sucesso'})
+    return jsonify({"msg": "Pasta atualizada"})
 
-@app.route("/folders/<int:folder_id>", methods=["DELETE"])
-def deletar_pasta(folder_id):
+@app.route("/folders/<int:id>", methods=["DELETE"])
+@login_required
+def deletar_folder(id):
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("DELETE FROM folders WHERE id = %s", (folder_id,))
+    cur.execute("DELETE FROM folders WHERE id = %s", (id,))
     conn.commit()
     cur.close()
     conn.close()
-    return jsonify({'msg': 'Pasta deletada com sucesso'})
+    return jsonify({"msg": "Pasta deletada"})
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+if __name__ == '__main__':
+    app.run(debug=True)

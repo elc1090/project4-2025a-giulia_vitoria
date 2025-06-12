@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import Header from "../components/Header";
 import Sidebar from "../components/Sidebar";
 import LinkList from "../components/LinkList";
@@ -20,34 +21,53 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
-  const user_id = localStorage.getItem("user_id");
-  const API_URL = 'http://localhost:5000';
+  const [userId, setUserId] = useState(localStorage.getItem("user_id"));
+  const API_URL = "http://localhost:5000";
 
   const [folders, setFolders] = useState([]);
 
-  async function fetchFolders(user_id) {
-    try {
-      const response = await fetch(`${API_URL}/folders?user_id=${user_id}`);
-      if (!response.ok) throw new Error("Erro ao buscar pastas");
-      const folders = await response.json();
-      setFolders(folders);
-    } catch (error) {
-      console.error(error.message);
-    }
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // 🔁 Busca user_id com base no username do GitHub
+  useEffect(() => {
+  const params = new URLSearchParams(location.search);
+  const username = params.get("username");
+
+  if (username) {
+    localStorage.setItem("github_username", username);
+
+    fetch(`${API_URL}/users/github/${username}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Usuário GitHub não encontrado");
+        return res.json();
+      })
+      .then((data) => {
+        localStorage.setItem("user_id", data.id);
+        setUserId(data.id);
+        // Navegar para /dashboard **sem** query string, para evitar recarregar a página
+        navigate("/dashboard", { replace: true });
+      })
+      .catch((err) => {
+        console.error(err);
+        navigate("/login", { replace: true });
+      });
+  } else {
+    navigate("/login", { replace: true });
   }
+}, [location.search, navigate]);
 
   useEffect(() => {
-    if (!user_id) return;
-    fetchFolders(user_id);
-  }, [user_id]);
+    if (!userId) return;
+    fetchFolders(userId);
+  }, [userId]);
 
   useEffect(() => {
-    if (!user_id) return;
-    let url = `${API_URL}/bookmarks?user_id=${user_id}`;
-    fetch(url)
-      .then(res => res.json())
-      .then(data => {
-        const formattedLinks = data.map(link => ({
+    if (!userId) return;
+    fetch(`${API_URL}/bookmarks?user_id=${userId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        const formattedLinks = data.map((link) => ({
           id: link.id,
           title: link.titulo,
           url: link.url,
@@ -55,12 +75,24 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
         }));
         setLinks(formattedLinks);
       })
-      .catch(err => console.error("Erro ao carregar links:", err));
-  }, [user_id]);
+      .catch((err) => console.error("Erro ao carregar links:", err));
+  }, [userId]);
 
-  const filteredLinks = links.filter(link => 
-    (link.title && link.title.toLowerCase().includes(searchTerm.toLowerCase())) || 
-    (link.description && link.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  const fetchFolders = async (uid) => {
+    try {
+      const response = await fetch(`${API_URL}/folders?user_id=${uid}`);
+      if (!response.ok) throw new Error("Erro ao buscar pastas");
+      const folders = await response.json();
+      setFolders(folders);
+    } catch (error) {
+      console.error(error.message);
+    }
+  };
+
+  const filteredLinks = links.filter(
+    (link) =>
+      (link.title && link.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (link.description && link.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleAddLink = async (e) => {
@@ -73,7 +105,7 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
       return;
     }
     const newLinkData = {
-      user_id: parseInt(user_id),
+      user_id: parseInt(userId),
       titulo: newTitle,
       url: newUrl,
       descricao: newDescription,
@@ -85,12 +117,15 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
         body: JSON.stringify(newLinkData),
       });
       const result = await res.json();
-      setLinks([{
-        id: result.id,
-        title: newTitle,
-        url: newUrl,
-        description: newDescription
-      }, ...links]);
+      setLinks([
+        {
+          id: result.id,
+          title: newTitle,
+          url: newUrl,
+          description: newDescription,
+        },
+        ...links,
+      ]);
       setNewTitle("");
       setNewUrl("");
       setNewDescription("");
@@ -120,7 +155,13 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
         }),
       });
       if (!res.ok) throw new Error("Erro ao salvar link");
-      setLinks(links.map(l => (l.id === editingLink.id ? { ...l, title: editingLink.titulo, url: editingLink.url, description: editingLink.descricao } : l)));
+      setLinks(
+        links.map((l) =>
+          l.id === editingLink.id
+            ? { ...l, title: editingLink.titulo, url: editingLink.url, description: editingLink.descricao }
+            : l
+        )
+      );
       setEditingLink(null);
     } catch (error) {
       setErro(error.message);
@@ -132,8 +173,8 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
   const handleDelete = async (id) => {
     setDeletingId(id);
     await fetch(`${API_URL}/bookmarks/${id}`, { method: "DELETE" });
-    setLinks(links.filter(link => link.id !== id));
-    setFavorites(favorites.filter(fav => fav.id !== id));
+    setLinks(links.filter((link) => link.id !== id));
+    setFavorites(favorites.filter((fav) => fav.id !== id));
     setDeletingId(null);
     setShowConfirm(false);
     setConfirmDeleteId(null);
@@ -150,15 +191,37 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
       <div style={styles.main}>
         <Sidebar
           folders={folders}
-          onCreateFolder={(newFolder) => setFolders(prev => [...prev, newFolder])}
-          onDeleteFolder={(id) => setFolders(prev => prev.filter(f => f.id !== id))}
-          onEditFolder={(id, name) => setFolders(prev => prev.map(f => f.id === id ? {...f, name} : f))}
+          onCreateFolder={(newFolder) => setFolders((prev) => [...prev, newFolder])}
+          onDeleteFolder={(id) => setFolders((prev) => prev.filter((f) => f.id !== id))}
+          onEditFolder={(id, name) =>
+            setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name } : f)))
+          }
         />
         <main style={styles.content}>
           <form onSubmit={handleAddLink} style={styles.form}>
-            <input type="text" placeholder="Título" value={newTitle} onChange={e => setNewTitle(e.target.value)} style={styles.input} required />
-            <input type="url" placeholder="URL" value={newUrl} onChange={e => setNewUrl(e.target.value)} style={styles.input} required />
-            <input type="text" placeholder="Descrição (opcional)" value={newDescription} onChange={e => setNewDescription(e.target.value)} style={styles.input} />
+            <input
+              type="text"
+              placeholder="Título"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              style={styles.input}
+              required
+            />
+            <input
+              type="url"
+              placeholder="URL"
+              value={newUrl}
+              onChange={(e) => setNewUrl(e.target.value)}
+              style={styles.input}
+              required
+            />
+            <input
+              type="text"
+              placeholder="Descrição (opcional)"
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+              style={styles.input}
+            />
             {erro && <span style={styles.erro}>{erro}</span>}
             <button type="submit" style={styles.button} disabled={isLoading}>
               {isLoading ? <div style={styles.loader}></div> : "Adicionar Link"}
@@ -167,14 +230,33 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
 
           {editingLink && (
             <form onSubmit={salvarEdicao} style={styles.form}>
-              <input type="text" value={editingLink.titulo} onChange={e => setEditingLink({ ...editingLink, titulo: e.target.value })} style={styles.input} required />
-              <input type="url" value={editingLink.url} onChange={e => setEditingLink({ ...editingLink, url: e.target.value })} style={styles.input} required />
-              <input type="text" value={editingLink.descricao || ""} onChange={e => setEditingLink({ ...editingLink, descricao: e.target.value })} style={styles.input} />
+              <input
+                type="text"
+                value={editingLink.titulo}
+                onChange={(e) => setEditingLink({ ...editingLink, titulo: e.target.value })}
+                style={styles.input}
+                required
+              />
+              <input
+                type="url"
+                value={editingLink.url}
+                onChange={(e) => setEditingLink({ ...editingLink, url: e.target.value })}
+                style={styles.input}
+                required
+              />
+              <input
+                type="text"
+                value={editingLink.descricao || ""}
+                onChange={(e) => setEditingLink({ ...editingLink, descricao: e.target.value })}
+                style={styles.input}
+              />
               {erro && <span style={styles.erro}>{erro}</span>}
               <button type="submit" style={styles.button} disabled={isSaving}>
                 {isSaving ? <div style={styles.loader}></div> : "Salvar"}
-                </button>
-              <button type="button" onClick={() => setEditingLink(null)} style={{ ...styles.button, backgroundColor: "gray" }}>Cancelar</button>
+              </button>
+              <button type="button" onClick={() => setEditingLink(null)} style={{ ...styles.button, backgroundColor: "gray" }}>
+                Cancelar
+              </button>
             </form>
           )}
 
@@ -185,8 +267,10 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
                 <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
                   <button onClick={() => handleDelete(confirmDeleteId)} style={{ ...styles.button, backgroundColor: "#2c3e50" }}>
                     {deletingId === confirmDeleteId ? <div style={styles.loader}></div> : "Sim, excluir"}
-                    </button>
-                  <button onClick={() => { setShowConfirm(false); setConfirmDeleteId(null); }} style={{ ...styles.button, backgroundColor: "gray" }}>Cancelar</button>
+                  </button>
+                  <button onClick={() => { setShowConfirm(false); setConfirmDeleteId(null); }} style={{ ...styles.button, backgroundColor: "gray" }}>
+                    Cancelar
+                  </button>
                 </div>
               </div>
             </div>
