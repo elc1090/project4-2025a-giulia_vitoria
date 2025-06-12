@@ -64,6 +64,14 @@ function LoginForm({ onLogin }) {
       <button type="submit" style={styles.button} disabled={isLoading}>
         {isLoading ? <div style={styles.loader}></div> : "Entrar"}
       </button>
+
+      <a
+        href={`${process.env.REACT_APP_API_URL}/github`}
+        style={{ ...styles.button, textAlign: "center", textDecoration: "none" }}
+      >
+        Entrar com GitHub
+      </a>
+
     </form>
   );
 }
