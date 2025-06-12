@@ -202,28 +202,32 @@ def listar_bookmarks():
     ]
     return jsonify(bookmarks)
 
-@app.route("/bookmarks", methods=["POST"])
-@login_required
+@app.route('/bookmarks', methods=['POST'])
 def criar_bookmark():
     data = request.json
     titulo = data.get('titulo')
     url = data.get('url')
     descricao = data.get('descricao')
-    user_id = data.get('user_id') or session.get("user_id")
+    user_id = data.get('user_id')
     folder_id = data.get('folder_id')
+
     if not titulo or not url or not user_id:
         return jsonify({'erro': 'Campos obrigatórios faltando'}), 400
+
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("""
+
+    cur.execute('''
         INSERT INTO bookmarks (user_id, folder_id, titulo, url, descricao)
         VALUES (%s, %s, %s, %s, %s)
         RETURNING id
-    """, (user_id, folder_id, titulo, url, descricao))
+    ''', (user_id, folder_id, titulo, url, descricao))
+
     novo_id = cur.fetchone()[0]
     conn.commit()
     cur.close()
     conn.close()
+
     return jsonify({'id': novo_id}), 201
 
 @app.route("/bookmarks/<int:id>", methods=["PUT"])
