@@ -13,12 +13,10 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "chave_secreta")
 
-# Frontend URL para CORS e redirecionamento após login
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": FRONTEND_URL}})
 
-# Blueprint de autenticação com GitHub
 github_bp = make_github_blueprint(
     client_id=os.environ.get("GITHUB_CLIENT_ID"),
     client_secret=os.environ.get("GITHUB_CLIENT_SECRET"),
@@ -50,7 +48,6 @@ def github_login():
     session["user_id"] = user_id
 
     query = urlencode({"username": username, "user_id": user_id})
-    # Redireciona para /dashboard do frontend, enviando username e user_id
     return redirect(f"{FRONTEND_URL}/dashboard?{query}")
 
 def find_or_create_github_user(username):
@@ -227,7 +224,13 @@ def criar_bookmark():
     cur.close()
     conn.close()
 
-    return jsonify({'id': novo_id}), 201
+    return jsonify({
+        'id': novo_id,
+        'titulo': titulo,
+        'url': url,
+        'descricao': descricao,
+        'folder_id': folder_id  
+    }), 201
 
 @app.route("/bookmarks/<int:id>", methods=["PUT"])
 def atualizar_bookmark(id):

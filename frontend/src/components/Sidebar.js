@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 export default function Sidebar({
   onCreateFolder = () => {},
@@ -9,40 +9,24 @@ export default function Sidebar({
   onDeleteFolder = () => {}
 }) {
 
-  const [folderName, setFolderName] = useState('');
-  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-  const user_id = localStorage.getItem("user_id");
+const [folderName, setFolderName] = useState('');
+const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+const user_id = localStorage.getItem("user_id");
 
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editFolderId, setEditFolderId] = useState(null);
-  const [editFolderName, setEditFolderName] = useState('');
+const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+const [editFolderId, setEditFolderId] = useState(null);
+const [editFolderName, setEditFolderName] = useState('');
 
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [deleteFolderId, setDeleteFolderId] = useState(null);
-  const [deleteFolderName, setDeleteFolderName] = useState('');
+const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+const [deleteFolderId, setDeleteFolderId] = useState(null);
+const [deleteFolderName, setDeleteFolderName] = useState('');
 
-  const [showMenus, setShowMenus] = useState({});
+const [showMenus, setShowMenus] = useState({});
 
-  const [hoveredFolderId, setHoveredFolderId] = useState(null);
-  const [hoveredMenuItem, setHoveredMenuItem] = useState({ folderId: null, item: null });
+const [hoveredFolderId, setHoveredFolderId] = useState(null);
+const [hoveredMenuItem, setHoveredMenuItem] = useState({ folderId: null, item: null });
 
 const API_URL = 'http://localhost:5000';
-
-useEffect(() => {
-  const fetchFolders = async () => {
-    if (!user_id) return;
-
-    try {
-      const res = await fetch(`${API_URL}/folders?user_id=${user_id}`);
-      const data = await res.json();
-      onCreateFolder(data); // ou setFolders(data) se usar estado local
-    } catch (err) {
-      console.error("Erro ao carregar pastas:", err);
-    }
-  };
-
-  fetchFolders();
-}, []);
 
   const openDeleteModal = (folder) => {
     setDeleteFolderId(folder.id);
@@ -274,7 +258,6 @@ useEffect(() => {
         ))}
       </ul>
 
-      {/* Modal Editar Pasta */}
       {isEditModalOpen && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
@@ -298,7 +281,6 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Modal Excluir Pasta */}
       {isDeleteModalOpen && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>

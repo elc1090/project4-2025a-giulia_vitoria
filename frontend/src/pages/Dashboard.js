@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Header from "../components/Header";
 import Sidebar from "../components/Sidebar";
@@ -25,60 +25,77 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
   const API_URL = "http://localhost:5000";
 
   const [folders, setFolders] = useState([]);
+  const [selectedFolder, setSelectedFolder] = useState(null);
 
   const location = useLocation();
   const navigate = useNavigate();
 
-  // 🔁 Busca user_id com base no username do GitHub
+  // Captura usuário GitHub e obtém user_id
   useEffect(() => {
-  const params = new URLSearchParams(location.search);
-  const username = params.get("username");
+    const params = new URLSearchParams(location.search);
+    const username = params.get("username");
 
-  if (username) {
-    localStorage.setItem("github_username", username);
+    if (userId) return;
 
-    fetch(`${API_URL}/users/github/${username}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Usuário GitHub não encontrado");
-        return res.json();
-      })
-      .then((data) => {
-        localStorage.setItem("user_id", data.id);
-        setUserId(data.id);
-        // Navegar para /dashboard **sem** query string, para evitar recarregar a página
-        navigate("/dashboard", { replace: true });
-      })
-      .catch((err) => {
-        console.error(err);
-        navigate("/login", { replace: true });
-      });
-  } else {
-    navigate("/login", { replace: true });
-  }
-}, [location.search, navigate]);
+    if (username) {
+      localStorage.setItem("github_username", username);
 
+      fetch(`${API_URL}/users/github/${username}`)
+        .then((res) => {
+          if (!res.ok) throw new Error("Usuário GitHub não encontrado");
+          return res.json();
+        })
+        .then((data) => {
+          localStorage.setItem("user_id", data.id);
+          setUserId(data.id);
+          navigate("/dashboard", { replace: true });
+        })
+        .catch((err) => {
+          console.error(err);
+          navigate("/login", { replace: true });
+        });
+    } else {
+      navigate("/login", { replace: true });
+    }
+  }, [location.search, navigate, userId]);
+
+  // Busca os links (useCallback para não ser recriada toda hora)
+  const fetchLinks = useCallback(async () => {
+    try {
+      const url = selectedFolder
+        ? `${API_URL}/bookmarks?user_id=${userId}&folder_id=${selectedFolder}`
+        : `${API_URL}/bookmarks?user_id=${userId}`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Erro ao buscar links");
+
+      const data = await res.json();
+      console.log("Dados recebidos:", data);
+
+      const formattedLinks = data.map((link) => ({
+        id: link.id,
+        title: link.titulo,
+        url: link.url,
+        description: link.descricao || "",
+        folderId: Number(link.folder_id),
+      }));
+
+      setLinks(formattedLinks);
+      console.log("Links formatados:", formattedLinks);
+    } catch (error) {
+      console.error("Erro ao carregar links:", error);
+    }
+  }, [userId, selectedFolder]);
+
+  // Chama fetchLinks quando userId ou selectedFolder mudam
   useEffect(() => {
-    if (!userId) return;
-    fetchFolders(userId);
-  }, [userId]);
+    if (userId) {
+      fetchLinks();
+    }
+  }, [userId, selectedFolder, fetchLinks]);
 
-  useEffect(() => {
-    if (!userId) return;
-    fetch(`${API_URL}/bookmarks?user_id=${userId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        const formattedLinks = data.map((link) => ({
-          id: link.id,
-          title: link.titulo,
-          url: link.url,
-          description: link.descricao || "",
-        }));
-        setLinks(formattedLinks);
-      })
-      .catch((err) => console.error("Erro ao carregar links:", err));
-  }, [userId]);
-
-  const fetchFolders = async (uid) => {
+  // Busca as pastas do usuário
+  const fetchFolders = useCallback(async (uid) => {
     try {
       const response = await fetch(`${API_URL}/folders?user_id=${uid}`);
       if (!response.ok) throw new Error("Erro ao buscar pastas");
@@ -87,13 +104,24 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
     } catch (error) {
       console.error(error.message);
     }
-  };
+  }, []);
 
-  const filteredLinks = links.filter(
-    (link) =>
-      (link.title && link.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (link.description && link.description.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Chama fetchFolders ao montar o componente ou userId mudar
+  useEffect(() => {
+    if (userId) {
+      fetchFolders(userId);
+    }
+  }, [userId, fetchFolders]);
+
+  const filteredLinks = links.filter((link) => {
+    const matchesSearch =
+      (!searchTerm || link.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (link.description && link.description.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesFolder = selectedFolder ? Number(link.folderId) === Number(selectedFolder) : true;
+
+    return matchesSearch && matchesFolder;
+  });
 
   const handleAddLink = async (e) => {
     e.preventDefault();
@@ -109,6 +137,7 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
       titulo: newTitle,
       url: newUrl,
       descricao: newDescription,
+      folder_id: selectedFolder,
     };
     try {
       const res = await fetch(`${API_URL}/bookmarks`, {
@@ -120,9 +149,10 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
       setLinks([
         {
           id: result.id,
-          title: newTitle,
-          url: newUrl,
-          description: newDescription,
+          title: result.titulo,
+          url: result.url,
+          description: result.descricao,
+          folderId: result.folder_id,
         },
         ...links,
       ]);
@@ -137,7 +167,12 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
   };
 
   function handleEdit(link) {
-    setEditingLink({ ...link, titulo: link.title, descricao: link.description });
+    setEditingLink({
+      id: link.id,
+      titulo: link.title,
+      url: link.url,
+      descricao: link.description || "",
+    });
   }
 
   async function salvarEdicao(e) {
@@ -191,6 +226,8 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
       <div style={styles.main}>
         <Sidebar
           folders={folders}
+          selectedFolder={selectedFolder}
+          setSelectedFolder={setSelectedFolder}
           onCreateFolder={(newFolder) => setFolders((prev) => [...prev, newFolder])}
           onDeleteFolder={(id) => setFolders((prev) => prev.filter((f) => f.id !== id))}
           onEditFolder={(id, name) =>
