@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from urllib.parse import urlencode
 import os
 import bcrypt
+import cohere
 from functools import wraps
 
 load_dotenv()
@@ -22,6 +23,8 @@ github_bp = make_github_blueprint(
     client_secret=os.environ.get("GITHUB_CLIENT_SECRET"),
 )
 app.register_blueprint(github_bp, url_prefix="/login")
+
+co = cohere.Client("6Q8xM0HbeoLc2pacLI6fLBpUttBP64k7yCQuByWU")
 
 def login_required(f):
     @wraps(f)
@@ -320,6 +323,29 @@ def deletar_pasta(folder_id):
     conn.close()
     
     return jsonify({'msg': 'Pasta deletada com sucesso'})
+
+@app.route("/suggest_bookmark", methods=["POST"])
+def suggest_bookmark():
+    data = request.json
+    descriptions = data.get("descriptions", [])
+    if not descriptions:
+        return jsonify({"erro": "Nenhuma descrição fornecida"}), 400
+
+    prompt = (
+        "Com base nas seguintes descrições de favoritos:\n"
+        + "\n".join(f"- {desc}" for desc in descriptions)
+        + "\nSugira um novo favorito relacionado, incluindo título e URL fictício:"
+    )
+
+    response = co.generate(
+        model="command",  # ou outro modelo disponível
+        prompt=prompt,
+        max_tokens=100
+    )
+
+    suggestion = response.generations[0].text.strip()
+    return jsonify({"suggestion": suggestion})
+
 
 if __name__ == '__main__':
     app.run(debug=True)
