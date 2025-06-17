@@ -27,6 +27,9 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
   const [folders, setFolders] = useState([]);
   const [selectedFolder, setSelectedFolder] = useState(null);
 
+  const [suggestion, setSuggestion] = useState(null);
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false);
+
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -86,14 +89,14 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
       console.error("Erro ao carregar links:", error);
     }
   }, [userId, selectedFolder]);
-
+  
   // Chama fetchLinks quando userId ou selectedFolder mudam
   useEffect(() => {
     if (userId) {
       fetchLinks();
     }
   }, [userId, selectedFolder, fetchLinks]);
-
+  
   // Busca as pastas do usuário
   const fetchFolders = useCallback(async (uid) => {
     try {
@@ -105,7 +108,7 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
       console.error(error.message);
     }
   }, []);
-
+  
   // Chama fetchFolders ao montar o componente ou userId mudar
   useEffect(() => {
     if (userId) {
@@ -115,10 +118,14 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
 
   const filteredLinks = links.filter((link) => {
     const matchesSearch =
-      (!searchTerm || link.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (link.description && link.description.toLowerCase().includes(searchTerm.toLowerCase()));
+      !searchTerm ||
+      link.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (link.description &&
+        link.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesFolder = selectedFolder ? Number(link.folderId) === Number(selectedFolder) : true;
+    const matchesFolder = selectedFolder
+      ? Number(link.folderId) === Number(selectedFolder)
+      : true;
 
     return matchesSearch && matchesFolder;
   });
@@ -193,7 +200,12 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
       setLinks(
         links.map((l) =>
           l.id === editingLink.id
-            ? { ...l, title: editingLink.titulo, url: editingLink.url, description: editingLink.descricao }
+            ? {
+                ...l,
+                title: editingLink.titulo,
+                url: editingLink.url,
+                description: editingLink.descricao,
+              }
             : l
         )
       );
@@ -220,18 +232,42 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
     setShowConfirm(true);
   };
 
+
+  async function fetchSuggestion() {
+    try {
+      setLoadingSuggestion(true);
+      const res = await fetch(`${API_URL}/suggest-bookmark?user_id=${userId}`);
+      const data = await res.json();
+      setSuggestion(data);
+    } catch (err) {
+      alert("Erro ao buscar sugestão: " + err.message);
+    } finally {
+      setLoadingSuggestion(false);
+    }
+  }
+
   return (
     <div style={styles.container}>
-      <Header onSearch={setSearchTerm} nomeUsuario={nomeUsuario} onLogout={onLogout} />
+      <Header
+        onSearch={setSearchTerm}
+        nomeUsuario={nomeUsuario}
+        onLogout={onLogout}
+      />
       <div style={styles.main}>
         <Sidebar
           folders={folders}
           selectedFolder={selectedFolder}
           setSelectedFolder={setSelectedFolder}
-          onCreateFolder={(newFolder) => setFolders((prev) => [...prev, newFolder])}
-          onDeleteFolder={(id) => setFolders((prev) => prev.filter((f) => f.id !== id))}
+          onCreateFolder={(newFolder) =>
+            setFolders((prev) => [...prev, newFolder])
+          }
+          onDeleteFolder={(id) =>
+            setFolders((prev) => prev.filter((f) => f.id !== id))
+          }
           onEditFolder={(id, name) =>
-            setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name } : f)))
+            setFolders((prev) =>
+              prev.map((f) => (f.id === id ? { ...f, name } : f))
+            )
           }
         />
         <main style={styles.content}>
@@ -310,6 +346,19 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
                   </button>
                 </div>
               </div>
+          <button
+            onClick={fetchSuggestion}
+            style={styles.button}
+            disabled={loadingSuggestion}
+          >
+            {loadingSuggestion
+              ? "Carregando sugestão..."
+              : "Sugerir bookmark com IA"}
+          </button>
+          {suggestion && (
+            <div style={{ marginTop: "10px" }}>
+              <strong>Sugestão:</strong> {suggestion.title} - {suggestion.url} (
+              {suggestion.description})
             </div>
           )}
           <LinkList links={filteredLinks} onEdit={handleEdit} onDelete={confirmDelete} grid />
@@ -329,5 +378,14 @@ const styles = {
   erro: { color: "red", fontSize: "14px" },
   modalOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center" },
   modal: { backgroundColor: "#fff", padding: "20px", borderRadius: "8px", minWidth: "300px" },
-  loader: { width: "24px", height: "24px", border: "4px solid rgba(255, 255, 255, 0.3)", borderTop: "4px solid white", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto" }
+  loader: { width: "24px", height: "24px", border: "4px solid rgba(255, 255, 255, 0.3)", borderTop: "4px solid white", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto" },
+  button: {
+    padding: "10px 20px",
+    borderRadius: "6px",
+    backgroundColor: "#2c3e50",
+    color: "#fff",
+    border: "none",
+    cursor: "pointer",
+    marginBottom: "10px",
+  },
 };
