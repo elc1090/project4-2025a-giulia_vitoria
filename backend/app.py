@@ -24,7 +24,7 @@ github_bp = make_github_blueprint(
 )
 app.register_blueprint(github_bp, url_prefix="/login")
 
-co = cohere.Client("6Q8xM0HbeoLc2pacLI6fLBpUttBP64k7yCQuByWU")
+co = cohere.Client("apikey")
 
 def login_required(f):
     @wraps(f)
