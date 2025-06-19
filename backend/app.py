@@ -12,7 +12,12 @@ from functools import wraps
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "chave_secreta")
+
+api_key = os.getenv("COHERE_API_KEY")
+print("[DEBUG] COHERE_API_KEY =", api_key)
+
+co = cohere.Client(api_key)
+
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
@@ -326,25 +331,30 @@ def deletar_pasta(folder_id):
 
 @app.route("/suggest_bookmark", methods=["POST"])
 def suggest_bookmark():
-    data = request.json
-    descriptions = data.get("descriptions", [])
-    if not descriptions:
-        return jsonify({"erro": "Nenhuma descrição fornecida"}), 400
+    try:
+        data = request.json
+        descricao = data.get("descricao", [])
+        if not descricao:
+            return jsonify({"erro": "Nenhuma descrição fornecida"}), 400
 
-    prompt = (
-        "Com base nas seguintes descrições de favoritos:\n"
-        + "\n".join(f"- {desc}" for desc in descriptions)
-        + "\nSugira um novo favorito relacionado, incluindo título e URL fictício:"
-    )
+        prompt = (
+            "Com base nas seguintes descrições de favoritos:\n"
+            + "\n".join(f"- {desc}" for desc in descricao)
+            + "\nSugira um novo favorito relacionado, incluindo título e URL fictício:"
+        )
 
-    response = co.generate(
-        model="command",  # ou outro modelo disponível
-        prompt=prompt,
-        max_tokens=100
-    )
+        response = co.generate(
+            prompt=prompt,
+            max_tokens=100
+        )
 
-    suggestion = response.generations[0].text.strip()
-    return jsonify({"suggestion": suggestion})
+        suggestion = response.generations[0].text.strip()
+        return jsonify({"suggestion": suggestion})
+
+    except Exception as e:
+        print("[ERRO] Sugestão falhou:", e)
+        return jsonify({"erro": str(e)}), 500
+
 
 
 if __name__ == '__main__':

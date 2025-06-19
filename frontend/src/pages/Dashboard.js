@@ -233,18 +233,32 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
   };
 
 
-  async function fetchSuggestion() {
-    try {
-      setLoadingSuggestion(true);
-      const res = await fetch(`${API_URL}/suggest-bookmark?user_id=${userId}`);
-      const data = await res.json();
-      setSuggestion(data);
-    } catch (err) {
-      alert("Erro ao buscar sugestão: " + err.message);
-    } finally {
-      setLoadingSuggestion(false);
-    }
+async function fetchSuggestion() {
+  try {
+    setLoadingSuggestion(true);
+
+    const res = await fetch(`${API_URL}/suggest_bookmark`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        descricao: [
+          "Um site de tutoriais de programação",
+          "Um artigo sobre segurança cibernética",
+        ], // substitua por suas descrições reais
+      }),
+    });
+
+    const data = await res.json();
+    setSuggestion(data);
+  } catch (err) {
+    alert("Erro ao buscar sugestão: " + err.message);
+  } finally {
+    setLoadingSuggestion(false);
   }
+}
+
 
   return (
     <div style={styles.container}>
@@ -334,34 +348,57 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
           )}
 
           {showConfirm && (
-            <div style={styles.modalOverlay}>
-              <div style={styles.modal}>
-                <p>Tem certeza que deseja excluir este link?</p>
-                <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                  <button onClick={() => handleDelete(confirmDeleteId)} style={{ ...styles.button, backgroundColor: "#2c3e50" }}>
-                    {deletingId === confirmDeleteId ? <div style={styles.loader}></div> : "Sim, excluir"}
-                  </button>
-                  <button onClick={() => { setShowConfirm(false); setConfirmDeleteId(null); }} style={{ ...styles.button, backgroundColor: "gray" }}>
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-          <button
-            onClick={fetchSuggestion}
-            style={styles.button}
-            disabled={loadingSuggestion}
-          >
-            {loadingSuggestion
-              ? "Carregando sugestão..."
-              : "Sugerir bookmark com IA"}
-          </button>
-          {suggestion && (
-            <div style={{ marginTop: "10px" }}>
-              <strong>Sugestão:</strong> {suggestion.title} - {suggestion.url} (
-              {suggestion.description})
-            </div>
+    <div style={styles.modalOverlay}>
+    <div style={styles.modal}>
+      <p>Tem certeza que deseja excluir este link?</p>
+      <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+        <button
+          onClick={() => handleDelete(confirmDeleteId)}
+          style={{ ...styles.button, backgroundColor: "#2c3e50" }}
+        >
+          {deletingId === confirmDeleteId ? (
+            <div style={styles.loader}></div>
+          ) : (
+            "Sim, excluir"
           )}
-          <LinkList links={filteredLinks} onEdit={handleEdit} onDelete={confirmDelete} grid />
+        </button>
+        <button
+          onClick={() => {
+            setShowConfirm(false);
+            setConfirmDeleteId(null);
+          }}
+          style={{ ...styles.button, backgroundColor: "gray" }}
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+<button
+  onClick={fetchSuggestion}
+  style={styles.button}
+  disabled={loadingSuggestion}
+>
+  {loadingSuggestion
+    ? "Carregando sugestão..."
+    : "Sugerir bookmark com IA"}
+</button>
+
+{suggestion && (
+  <div style={{ marginTop: "10px" }}>
+    <strong>Sugestão:</strong> {suggestion.title} - {suggestion.url} (
+    {suggestion.description})
+  </div>
+)}
+
+<LinkList
+            links={filteredLinks}
+            onEdit={handleEdit}
+            onDelete={confirmDelete}
+            grid
+          />
         </main>
       </div>
     </div>
@@ -372,13 +409,21 @@ const styles = {
   container: { height: "100vh", display: "flex", flexDirection: "column" },
   main: { flex: 1, display: "flex" },
   content: { flex: 1, padding: "20px", background: "#e9ebee", overflowY: "auto" },
-  form: { display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "20px", alignItems: "center" },
-  input: { flex: "1 1 150px", padding: "10px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "14px", minWidth: "150px" },
-  button: { padding: "10px 20px", borderRadius: "6px", backgroundColor: "#2c3e50", color: "#fff", border: "none", cursor: "pointer" },
-  erro: { color: "red", fontSize: "14px" },
-  modalOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center" },
-  modal: { backgroundColor: "#fff", padding: "20px", borderRadius: "8px", minWidth: "300px" },
-  loader: { width: "24px", height: "24px", border: "4px solid rgba(255, 255, 255, 0.3)", borderTop: "4px solid white", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto" },
+  form: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "10px",
+    marginBottom: "20px",
+    alignItems: "center",
+  },
+  input: {
+    flex: "1 1 150px",
+    padding: "10px",
+    borderRadius: "6px",
+    border: "1px solid #ccc",
+    fontSize: "14px",
+    minWidth: "150px",
+  },
   button: {
     padding: "10px 20px",
     borderRadius: "6px",
@@ -387,5 +432,32 @@ const styles = {
     border: "none",
     cursor: "pointer",
     marginBottom: "10px",
+  },
+  erro: { color: "red", fontSize: "14px" },
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modal: {
+    backgroundColor: "#fff",
+    padding: "20px",
+    borderRadius: "8px",
+    minWidth: "300px",
+  },
+  loader: {
+    width: "24px",
+    height: "24px",
+    border: "4px solid rgba(255, 255, 255, 0.3)",
+    borderTop: "4px solid white",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+    margin: "0 auto",
   },
 };
