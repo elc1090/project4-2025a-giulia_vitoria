@@ -4,6 +4,7 @@ from flask_cors import CORS
 from db import get_connection
 from dotenv import load_dotenv
 from urllib.parse import urlencode
+from flask import send_from_directory
 import os
 import bcrypt
 import cohere
@@ -13,10 +14,14 @@ load_dotenv()
 print("[DEBUG] CHAVE =", os.getenv("COHERE_API_KEY"))
 
 app = Flask(__name__)
-app.secret_key = "dev"
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev")
 
 co = cohere.Client(os.getenv("COHERE_API_KEY"))
 
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
@@ -28,7 +33,9 @@ github_bp = make_github_blueprint(
 )
 app.register_blueprint(github_bp, url_prefix="/login")
 
-co = cohere.Client("apikey")
+@app.route("/")
+def index():
+    return jsonify({"msg": "API Flask ativa. Use /login, /bookmarks, etc."})
 
 def login_required(f):
     @wraps(f)
@@ -126,7 +133,6 @@ def create_user(username, email, password):
         return False, str(e)
     finally:
         conn.close()
-    pass
 
 @app.route("/usuarios", methods=["POST"])
 def cadastrar_usuario():
