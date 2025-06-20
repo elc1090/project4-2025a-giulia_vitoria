@@ -7,7 +7,7 @@ Uma aplicação fullstack que permite aos usuários cadastrados compartilhar, vi
 
 ## Acesso
 
-- **Frontend:** https://front-bookmark.vercel.app
+- **Frontend:** https://front-web-five.vercel.app/
 - Para acessar, você pode criar um novo usuário, ou fazer login com algum já existente
 - Usuário para teste: vitoria@gmail.com, 1234
 
@@ -85,7 +85,7 @@ Etapas principais do projeto:
 - python3 -m venv venv
 - venv\Scripts\activate
 - pip install -r requirements.txt
-- flas run
+- flask run
 
 **Frontend**
 - cd frontend
