@@ -25,7 +25,10 @@ def favicon():
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
-CORS(app, supports_credentials=True, resources={r"/*": {"origins": FRONTEND_URL}})
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": [
+    "http://localhost:3000",
+    "https://front-jjm9c51wh-vitoria-luiza-camaras-projects.vercel.app"
+]}})
 
 github_bp = make_github_blueprint(
     client_id=os.environ.get("GITHUB_CLIENT_ID"),
