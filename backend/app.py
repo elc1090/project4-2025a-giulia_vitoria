@@ -27,7 +27,8 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": [
     "http://localhost:3000",
-    "https://front-jjm9c51wh-vitoria-luiza-camaras-projects.vercel.app"
+    "https://front-jjm9c51wh-vitoria-luiza-camaras-projects.vercel.app",
+    "https://front-web-five.vercel.app"
 ]}})
 
 github_bp = make_github_blueprint(
