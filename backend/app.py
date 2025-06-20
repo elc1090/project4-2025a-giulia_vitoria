@@ -10,13 +10,12 @@ import cohere
 from functools import wraps
 
 load_dotenv()
+print("[DEBUG] CHAVE =", os.getenv("COHERE_API_KEY"))
 
 app = Flask(__name__)
+app.secret_key = "dev"
 
-api_key = os.getenv("COHERE_API_KEY")
-print("[DEBUG] COHERE_API_KEY =", api_key)
-
-co = cohere.Client(api_key)
+co = cohere.Client(os.getenv("COHERE_API_KEY"))
 
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
