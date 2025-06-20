@@ -21,7 +21,7 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
-  const [userId, setUserId] = useState(localStorage.getItem("user_id"));
+  const [user_id, setuser_id] = useState(localStorage.getItem("user_id"));
   const API_URL = "http://localhost:5000";
 
   const [folders, setFolders] = useState([]);
@@ -38,7 +38,7 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
     const params = new URLSearchParams(location.search);
     const username = params.get("username");
 
-    if (userId) return;
+    if (user_id) return;
 
     if (username) {
       localStorage.setItem("github_username", username);
@@ -50,7 +50,7 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
         })
         .then((data) => {
           localStorage.setItem("user_id", data.id);
-          setUserId(data.id);
+          setuser_id(data.id);
           navigate("/dashboard", { replace: true });
         })
         .catch((err) => {
@@ -60,14 +60,14 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
     } else {
       navigate("/login", { replace: true });
     }
-  }, [location.search, navigate, userId]);
+  }, [location.search, navigate, user_id]);
 
   // Busca os links (useCallback para não ser recriada toda hora)
   const fetchLinks = useCallback(async () => {
     try {
       const url = selectedFolder
-        ? `${API_URL}/bookmarks?user_id=${userId}&folder_id=${selectedFolder}`
-        : `${API_URL}/bookmarks?user_id=${userId}`;
+        ? `${API_URL}/bookmarks?user_id=${user_id}&folder_id=${selectedFolder}`
+        : `${API_URL}/bookmarks?user_id=${user_id}`;
 
       const res = await fetch(url);
       if (!res.ok) throw new Error("Erro ao buscar links");
@@ -88,14 +88,14 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
     } catch (error) {
       console.error("Erro ao carregar links:", error);
     }
-  }, [userId, selectedFolder]);
+  }, [user_id, selectedFolder]);
   
-  // Chama fetchLinks quando userId ou selectedFolder mudam
+  // Chama fetchLinks quando user_id ou selectedFolder mudam
   useEffect(() => {
-    if (userId) {
+    if (user_id) {
       fetchLinks();
     }
-  }, [userId, selectedFolder, fetchLinks]);
+  }, [user_id, selectedFolder, fetchLinks]);
   
   // Busca as pastas do usuário
   const fetchFolders = useCallback(async (uid) => {
@@ -109,12 +109,12 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
     }
   }, []);
   
-  // Chama fetchFolders ao montar o componente ou userId mudar
+  // Chama fetchFolders ao montar o componente ou user_id mudar
   useEffect(() => {
-    if (userId) {
-      fetchFolders(userId);
+    if (user_id) {
+      fetchFolders(user_id);
     }
-  }, [userId, fetchFolders]);
+  }, [user_id, fetchFolders]);
 
   const filteredLinks = links.filter((link) => {
     const matchesSearch =
@@ -140,7 +140,7 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
       return;
     }
     const newLinkData = {
-      user_id: parseInt(userId),
+      user_id: parseInt(user_id),
       titulo: newTitle,
       url: newUrl,
       descricao: newDescription,
@@ -236,28 +236,37 @@ export default function Dashboard({ nomeUsuario, onLogout }) {
 async function fetchSuggestion() {
   try {
     setLoadingSuggestion(true);
-
     const res = await fetch(`${API_URL}/suggest_bookmark`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        descricao: [
-          "Um site de tutoriais de programação",
-          "Um artigo sobre segurança cibernética",
-        ], // substitua por suas descrições reais
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id }),
     });
-
     const data = await res.json();
-    setSuggestion(data);
+
+    if (res.ok) {
+      // Atualiza a lista de links com o novo bookmark
+      setLinks((prev) => [
+        {
+          id: data.id,
+          title: data.title,
+          url: data.url,
+          description: data.description,
+          folderId: null,
+        },
+        ...prev,
+      ]);
+      setSuggestion(data);
+    } else {
+      alert("Erro ao sugerir: " + data.erro);
+    }
   } catch (err) {
     alert("Erro ao buscar sugestão: " + err.message);
   } finally {
     setLoadingSuggestion(false);
   }
 }
+
+
 
 
   return (

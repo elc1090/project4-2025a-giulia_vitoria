@@ -5,6 +5,7 @@ from db import get_connection
 from dotenv import load_dotenv
 from urllib.parse import urlencode
 import os
+import re
 import bcrypt
 import cohere
 from functools import wraps
@@ -17,7 +18,6 @@ app.secret_key = "dev"
 
 co = cohere.Client(os.getenv("COHERE_API_KEY"))
 
-
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": FRONTEND_URL}})
@@ -27,8 +27,6 @@ github_bp = make_github_blueprint(
     client_secret=os.environ.get("GITHUB_CLIENT_SECRET"),
 )
 app.register_blueprint(github_bp, url_prefix="/login")
-
-co = cohere.Client("apikey")
 
 def login_required(f):
     @wraps(f)
@@ -66,7 +64,6 @@ def find_or_create_github_user(username):
         cur.close()
         conn.close()
         return user[0]
-    # Insere usuário GitHub com email fake e senha vazia
     cur.execute(
         "INSERT INTO users (username, email, password_hash) VALUES (%s, %s, %s) RETURNING id",
         (username, f"{username}@github.com", ""),
@@ -126,7 +123,6 @@ def create_user(username, email, password):
         return False, str(e)
     finally:
         conn.close()
-    pass
 
 @app.route("/usuarios", methods=["POST"])
 def cadastrar_usuario():
@@ -144,7 +140,6 @@ def cadastrar_usuario():
         return jsonify({"msg": msg}), 201
     else:
         return jsonify({"erro": msg}), 400
-    pass
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -205,156 +200,77 @@ def listar_bookmarks():
     ]
     return jsonify(bookmarks)
 
-@app.route('/bookmarks', methods=['POST'])
-def criar_bookmark():
-    data = request.json
-    titulo = data.get('titulo')
-    url = data.get('url')
-    descricao = data.get('descricao')
-    user_id = data.get('user_id')
-    folder_id = data.get('folder_id')
-
-    if not titulo or not url or not user_id:
-        return jsonify({'erro': 'Campos obrigatórios faltando'}), 400
-
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute('''
-        INSERT INTO bookmarks (user_id, folder_id, titulo, url, descricao)
-        VALUES (%s, %s, %s, %s, %s)
-        RETURNING id
-    ''', (user_id, folder_id, titulo, url, descricao))
-
-    novo_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    return jsonify({
-        'id': novo_id,
-        'titulo': titulo,
-        'url': url,
-        'descricao': descricao,
-        'folder_id': folder_id  
-    }), 201
-
-@app.route("/bookmarks/<int:id>", methods=["PUT"])
-def atualizar_bookmark(id):
-    data = request.get_json()
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "UPDATE bookmarks SET titulo = %s, url = %s, descricao = %s WHERE id = %s",
-        (data["titulo"], data["url"], data.get("descricao"), id)
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({"msg": "Atualizado com sucesso"})
-
-@app.route("/bookmarks/<int:id>", methods=["DELETE"])
-def deletar_bookmark(id):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM bookmarks WHERE id = %s", (id,))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({"msg": "Deletado com sucesso"})
-
-@app.route('/folders', methods=['GET'])
-
-def listar_folders():
-    user_id = request.args.get('user_id')
-
-    if not user_id:
-        return jsonify({'erro': 'user_id não fornecido'}), 400
-
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute('SELECT id, name FROM folders WHERE user_id = %s', (user_id,))
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-
-    folders = [{'id': r[0], 'name': r[1]} for r in rows]
-
-    return jsonify(folders)
-
-@app.route('/folders', methods=['POST'])
-def criar_folder():
-    data = request.get_json()
-    name = data.get('name')
-    user_id = data.get('user_id')
-
-    if not name or not user_id:
-        return jsonify({'erro': 'Campos obrigatórios faltando'}), 400
-
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute('INSERT INTO folders (user_id, name) VALUES (%s, %s) RETURNING id', (user_id, name))
-    novo_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    return jsonify({'id': novo_id}), 201
-
-@app.route('/folders/<int:folder_id>', methods=['PUT'])
-def atualizar_pasta(folder_id):
-    data = request.get_json()
-    novo_nome = data.get('name')
-    if not novo_nome:
-        return jsonify({'erro': 'Nome é obrigatório'}), 400
-
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("UPDATE folders SET name = %s WHERE id = %s", (novo_nome, folder_id))
-    conn.commit()
-    cur.close()
-    conn.close()
-    
-    return jsonify({'msg': 'Pasta atualizada com sucesso'})
-
-@app.route('/folders/<int:folder_id>', methods=['DELETE'])
-def deletar_pasta(folder_id):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM folders WHERE id = %s", (folder_id,))
-    conn.commit()
-    cur.close()
-    conn.close()
-    
-    return jsonify({'msg': 'Pasta deletada com sucesso'})
-
 @app.route("/suggest_bookmark", methods=["POST"])
 def suggest_bookmark():
     try:
-        data = request.json
-        descricao = data.get("descricao", [])
-        if not descricao:
-            return jsonify({"erro": "Nenhuma descrição fornecida"}), 400
+        data = request.get_json()
+        user_id = data.get("user_id")
+        if not user_id:
+            return jsonify({"erro": "user_id não fornecido"}), 400
 
+        # Buscar descrições
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT descricao FROM bookmarks WHERE user_id = %s AND descricao IS NOT NULL", (user_id,))
+        descricoes = [row[0] for row in cur.fetchall()]
+        cur.close()
+        conn.close()
+
+        if not descricoes:
+            return jsonify({"erro": "Nenhuma descrição encontrada"}), 400
+
+        # Prompt direto
         prompt = (
-            "Com base nas seguintes descrições de favoritos:\n"
-            + "\n".join(f"- {desc}" for desc in descricao)
-            + "\nSugira um novo favorito relacionado, incluindo título e URL fictício:"
+            "Based on the following bookmark descriptions, generate only **one** new related bookmark "
+            "and return it in this exact format:\n"
+            "Title;URL;Description (in a single line, separated by semicolons)\n\n"
+            "Example:\nAmazon;https://www.amazon.com;E-commerce\n\n"
+            "⚠️ Output only one line in that format. Do not add explanations, extra text, or repeat the input.\n\n"
+            + "\n".join(f"- {desc}" for desc in descricoes)
         )
 
-        response = co.generate(
-            prompt=prompt,
-            max_tokens=100
-        )
 
-        suggestion = response.generations[0].text.strip()
-        return jsonify({"suggestion": suggestion})
+
+        # Geração da resposta
+        response = co.generate(prompt=prompt, max_tokens=100, model="command-r-plus")
+        texto = response.generations[0].text.strip()
+        print("[DEBUG] IA retorno:\n", texto)
+
+        # Captura apenas a primeira linha que contém dois ';'
+        linha_valida = next((l.strip() for l in texto.splitlines() if l.count(";") == 2), None)
+
+        if not linha_valida:
+            return jsonify({"erro": "Formato da sugestão inválido"}), 500
+
+        partes = linha_valida.split(";")
+        titulo = partes[0].strip()
+        url = partes[1].strip()
+        descricao = partes[2].strip()
+
+
+        # Inserção
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO bookmarks (user_id, titulo, url, descricao) VALUES (%s, %s, %s, %s) RETURNING id",
+            (user_id, titulo, url, descricao)
+        )
+        novo_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({
+            "id": novo_id,
+            "title": titulo,
+            "url": url,
+            "description": descricao
+        }), 201
 
     except Exception as e:
         print("[ERRO] Sugestão falhou:", e)
         return jsonify({"erro": str(e)}), 500
 
 
-
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False)
