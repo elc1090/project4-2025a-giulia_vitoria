@@ -74,7 +74,7 @@ Etapas principais do projeto:
 ## Repositório FrontEnd
 
 - Optamos por separar o front e o back em diferentes repositórios a fim de facilitar o deploy do projeto. 
-- Repositório do [FrontEnd](https://github.com/iamvitoria/Front-Bookmark.git)
+- Repositório do [FrontEnd](https://github.com/iamvitoria/Front-Web)
 
 ---
 ## Para rodar localmente 
