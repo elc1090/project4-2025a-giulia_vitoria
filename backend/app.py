@@ -194,59 +194,85 @@ def listar_bookmarks():
     conn = get_connection()
     cur = conn.cursor()
 
-    if folder_id:
-        cur.execute(
-            "SELECT id, titulo, url, descricao, criado_em FROM bookmarks WHERE user_id = %s AND folder_id = %s ORDER BY criado_em DESC",
-            (user_id, folder_id)
-        )
-    else:
-        cur.execute(
-            "SELECT id, titulo, url, descricao, criado_em FROM bookmarks WHERE user_id = %s ORDER BY criado_em DESC",
-            (user_id,)
-        )
+    try:
+        if folder_id:
+            cur.execute(
+                """
+                SELECT id, titulo, url, descricao, criado_em, folder_id
+                FROM bookmarks
+                WHERE user_id = %s AND folder_id = %s
+                ORDER BY criado_em DESC
+                """,
+                (user_id, folder_id)
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id, titulo, url, descricao, criado_em, folder_id
+                FROM bookmarks
+                WHERE user_id = %s
+                ORDER BY criado_em DESC
+                """,
+                (user_id,)
+            )
 
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
+        rows = cur.fetchall()
+        bookmarks = [
+            {
+                "id": r[0],
+                "titulo": r[1],
+                "url": r[2],
+                "descricao": r[3],
+                "criado_em": r[4].isoformat() if r[4] else None,
+                "folder_id": r[5]
+            }
+            for r in rows
+        ]
 
-    bookmarks = [
-        {"id": r[0], "titulo": r[1], "url": r[2], "descricao": r[3], "criado_em": r[4].isoformat()}
-        for r in rows
-    ]
-    return jsonify(bookmarks)
+        return jsonify(bookmarks)
 
-@app.route('/bookmarks', methods=['POST'])
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route("/bookmarks", methods=["POST"])
 def criar_bookmark():
-    data = request.json
-    titulo = data.get('titulo')
-    url = data.get('url')
-    descricao = data.get('descricao')
-    user_id = data.get('user_id')
-    folder_id = data.get('folder_id')
+    data = request.get_json()
 
-    if not titulo or not url or not user_id:
-        return jsonify({'erro': 'Campos obrigatórios faltando'}), 400
+    user_id = data.get("user_id")
+    titulo = data.get("titulo")
+    url = data.get("url")
+    descricao = data.get("descricao", "")
+    folder_id = data.get("folder_id")
+    folder_id = request.args.get("folder_id", type=int)
+
+    if not user_id or not titulo or not url:
+        return jsonify({"erro": "Campos obrigatórios ausentes"}), 400
 
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute('''
-        INSERT INTO bookmarks (user_id, folder_id, titulo, url, descricao)
+    cur.execute("""
+        INSERT INTO bookmarks (user_id, titulo, url, descricao, folder_id)
         VALUES (%s, %s, %s, %s, %s)
         RETURNING id
-    ''', (user_id, folder_id, titulo, url, descricao))
+    """, (user_id, titulo, url, descricao, folder_id))
 
-    novo_id = cur.fetchone()[0]
+    bookmark_id = cur.fetchone()[0]
     conn.commit()
+
     cur.close()
     conn.close()
 
     return jsonify({
-        'id': novo_id,
-        'titulo': titulo,
-        'url': url,
-        'descricao': descricao,
-        'folder_id': folder_id  
+        "id": bookmark_id,
+        "titulo": titulo,
+        "url": url,
+        "descricao": descricao,
+        "folder_id": folder_id
     }), 201
 
 @app.route("/bookmarks/<int:id>", methods=["PUT"])

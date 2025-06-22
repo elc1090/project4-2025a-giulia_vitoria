@@ -138,7 +138,7 @@ def move_bookmark_to_folder(bookmark_id, folder_id, user_id):
     finally:
         conn.close()
 
-def get_bookmarks_by_folder(folder_id, user_id):
+def get_bookmarks_by_user(user_id):
     conn = get_connection()
     if not conn:
         return []
@@ -146,14 +146,15 @@ def get_bookmarks_by_folder(folder_id, user_id):
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute("""
-            SELECT id, title, url, description FROM bookmarks
-            WHERE folder_id = %s AND user_id = %s
-        """, (folder_id, user_id))
+            SELECT id, titulo, url, descricao, criado_em, folder_id FROM bookmarks
+            WHERE user_id = %s
+            ORDER BY criado_em DESC
+        """, (user_id,))
         bookmarks = cur.fetchall()
         cur.close()
         return bookmarks
     except Exception as e:
-        print(f"Erro ao buscar bookmarks da pasta: {e}")
+        print(f"Erro ao buscar bookmarks do usuário: {e}")
         return []
     finally:
         conn.close()
