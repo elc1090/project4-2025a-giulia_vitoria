@@ -246,8 +246,7 @@ def criar_bookmark():
     titulo = data.get("titulo")
     url = data.get("url")
     descricao = data.get("descricao", "")
-    folder_id = data.get("folder_id")
-    folder_id = request.args.get("folder_id", type=int)
+    folder_id = data.get("folder_id")  # <- este é o correto
 
     if not user_id or not titulo or not url:
         return jsonify({"erro": "Campos obrigatórios ausentes"}), 400
