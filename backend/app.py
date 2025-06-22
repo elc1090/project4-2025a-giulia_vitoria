@@ -375,50 +375,53 @@ def suggest_bookmark():
         from db import get_bookmarks_by_user
         bookmarks = get_bookmarks_by_user(user_id)
         existing_titles = {b["titulo"].lower() for b in bookmarks}
-        descricoes = [b["descricao"] for b in bookmarks if b["descricao"]]
+        existing_urls = {b["url"].lower() for b in bookmarks}
+        descriptions = [b["descricao"] for b in bookmarks if b["descricao"]]
 
-        if not descricoes:
-            return jsonify({"erro": "Nenhuma descrição encontrada"}), 400
+        if not descriptions:
+            return jsonify({"erro": "No descriptions available"}), 400
 
-        prompt = (
-            "Based on the following bookmark descriptions, suggest only ONE new, related bookmark.\n"
-            "Return it in the format: Title;URL;Description (all in one line, separated by semicolons).\n"
-            "Do not repeat any of the existing titles. Do not explain. Just return the line.\n\n"
-            "Descriptions:\n"
-            + "\n".join(f"- {desc}" for desc in descricoes)
-        )
+        MAX_ATTEMPTS = 3
+        for _ in range(MAX_ATTEMPTS):
+            prompt = (
+                "Based on the following bookmark descriptions, suggest ONE new useful bookmark.\n"
+                "Return it in the format: Title;URL;Description (all in one line).\n"
+                "Do NOT repeat any existing titles or URLs. Do NOT add explanations.\n\n"
+                "Descriptions:\n" + "\n".join(f"- {d.strip()}" for d in descriptions)
+            )
 
-        response = co.generate(prompt=prompt, max_tokens=100)
-        texto = response.generations[0].text.strip()
-        print("[DEBUG] IA retorno:\n", texto)
+            response = co.generate(prompt=prompt, max_tokens=100)
+            text = response.generations[0].text.strip()
+            print("[DEBUG] Cohere output:\n", text)
 
-        partes = texto.split(";")
-        if len(partes) != 3:
-            return jsonify({"erro": "Formato inválido da IA"}), 500
+            parts = text.split(";")
+            if len(parts) != 3:
+                continue
 
-        titulo, url, descricao = [p.strip() for p in partes]
+            title, url, description = [p.strip() for p in parts]
 
-        if titulo.lower() in existing_titles:
-            return jsonify({"erro": "Sugestão repetida"}), 400
+            if title.lower() in existing_titles or url.lower() in existing_urls:
+                continue
 
-        # Inserir no banco
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO bookmarks (user_id, titulo, url, descricao) VALUES (%s, %s, %s, %s) RETURNING id",
-            (user_id, titulo, url, descricao),
-        )
-        novo_id = cur.fetchone()[0]
-        conn.commit()
-        cur.close()
-        conn.close()
+            conn = get_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO bookmarks (user_id, titulo, url, descricao) VALUES (%s, %s, %s, %s) RETURNING id",
+                (user_id, title, url, description),
+            )
+            new_id = cur.fetchone()[0]
+            conn.commit()
+            cur.close()
+            conn.close()
 
-        return jsonify({
-            "id": novo_id,
-            "title": titulo,
-            "url": url,
-            "description": descricao
-        }), 201
+            return jsonify({
+                "id": new_id,
+                "title": title,
+                "url": url,
+                "description": description
+            }), 201
+
+        return jsonify({"erro": "All suggestions were duplicates"}), 400
 
     except Exception as e:
         print("[ERRO] Sugestão falhou:", e)
