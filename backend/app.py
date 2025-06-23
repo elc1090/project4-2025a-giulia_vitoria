@@ -390,55 +390,48 @@ def suggest_bookmark():
         if not bookmarks:
             return jsonify({"erro": "Usuário não possui bookmarks"}), 400
 
-        descriptions = [
-            f"{b['titulo']}: {b['descricao']}" if b['descricao'] else b['titulo']
-            for b in bookmarks
-        ]
-
         existing_titles = {b["titulo"].lower() for b in bookmarks}
         existing_urls = {b["url"].lower() for b in bookmarks}
 
-        possiveis_sugestoes = [
-            {"title": "DeepSeek", "url": "https://www.deepseek.com", "description": "Ferramenta de IA para pesquisa avançada"},
-            {"title": "Shein", "url": "https://www.shein.com", "description": "Loja online com moda acessível"},
-            {"title": "Claude", "url": "https://claude.ai", "description": "IA conversacional alternativa ao ChatGPT"},
-            {"title": "Temu", "url": "https://www.temu.com", "description": "Marketplace global de ofertas"},
-            {"title": "Perplexity AI", "url": "https://www.perplexity.ai", "description": "Buscador com IA e fontes citadas"},
-        ]
+        context_lines = []
+        for b in bookmarks:
+            line = f"{b['titulo']}: {b['descricao']}" if b['descricao'] else b['titulo']
+            context_lines.append(line)
 
-        # Similaridade com SentenceTransformers
-        from sentence_transformers import SentenceTransformer, util
-        model = SentenceTransformer("all-MiniLM-L6-v2")
-
-        user_embeds = model.encode(descriptions, convert_to_tensor=True)
-        sugestao_embeds = model.encode(
-            [s["description"] for s in possiveis_sugestoes], convert_to_tensor=True
+        prompt = (
+            "Com base nos links salvos pelo usuário abaixo, sugira UM novo bookmark que faça sentido com os temas presentes.\n"
+            "Formato da resposta: Título;URL;Descrição\n"
+            "Não repita nenhum título ou link já existente.\n"
+            "Apenas dê a sugestão, sem explicações.\n\n"
+            "Bookmarks do usuário:\n" +
+            "\n".join(f"- {line}" for line in context_lines) +
+            "\n\nSugestão:"
         )
 
-        scores = util.cos_sim(user_embeds, sugestao_embeds).mean(dim=0)
-        melhor_idx = scores.argmax().item()
-        melhor_sugestao = possiveis_sugestoes[melhor_idx]
+        response = co.generate(
+            prompt=prompt,
+            max_tokens=100,
+            temperature=0.7,
+            stop_sequences=["\n"]
+        )
 
-        if (
-            melhor_sugestao["title"].lower() in existing_titles
-            or melhor_sugestao["url"].lower() in existing_urls
-        ):
-            return jsonify({"erro": "Nenhuma sugestão nova disponível"}), 400
+        text = response.generations[0].text.strip()
+        print("[DEBUG] Sugestão da IA:", text)
+
+        parts = text.split(";")
+        if len(parts) != 3:
+            return jsonify({"erro": "Formato inválido da sugestão"}), 400
+
+        title, url, description = [p.strip() for p in parts]
+
+        if title.lower() in existing_titles or url.lower() in existing_urls:
+            return jsonify({"erro": "Sugestão repetida"}), 400
 
         conn = get_connection()
         cur = conn.cursor()
         cur.execute(
-            """
-            INSERT INTO bookmarks (user_id, titulo, url, descricao)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id
-            """,
-            (
-                user_id,
-                melhor_sugestao["title"],
-                melhor_sugestao["url"],
-                melhor_sugestao["description"],
-            ),
+            "INSERT INTO bookmarks (user_id, titulo, url, descricao) VALUES (%s, %s, %s, %s) RETURNING id",
+            (user_id, title, url, description),
         )
         new_id = cur.fetchone()[0]
         conn.commit()
@@ -447,9 +440,9 @@ def suggest_bookmark():
 
         return jsonify({
             "id": new_id,
-            "title": melhor_sugestao["title"],
-            "url": melhor_sugestao["url"],
-            "description": melhor_sugestao["description"]
+            "title": title,
+            "url": url,
+            "description": description
         }), 201
 
     except Exception as e:
