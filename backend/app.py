@@ -16,6 +16,11 @@ load_dotenv()
 print("[DEBUG] CHAVE =", os.getenv("COHERE_API_KEY"))
 
 app = Flask(__name__)
+
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev")
 
 co = cohere.Client(os.getenv("COHERE_API_KEY"))
@@ -36,7 +41,7 @@ CORS(app, supports_credentials=True, resources={r"/*": {"origins": [
 github_bp = make_github_blueprint(
     client_id=os.getenv("GITHUB_CLIENT_ID"),
     client_secret=os.getenv("GITHUB_CLIENT_SECRET"),
-    redirect_url="/login/github/authorized"
+    redirect_to="github_login"  
 )
 app.register_blueprint(github_bp, url_prefix="/login")
 
@@ -434,9 +439,6 @@ def suggest_bookmark():
     except Exception as e:
         print("[ERRO] Sugestão falhou:", e)
         return jsonify({"erro": str(e)}), 500
-
-
-
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
