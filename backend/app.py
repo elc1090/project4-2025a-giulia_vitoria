@@ -384,57 +384,73 @@ def suggest_bookmark():
         if not user_id:
             return jsonify({"erro": "user_id não fornecido"}), 400
 
-        # Buscar bookmarks existentes do usuário
         from db import get_bookmarks_by_user
         bookmarks = get_bookmarks_by_user(user_id)
+
+        if not bookmarks:
+            return jsonify({"erro": "Usuário não possui bookmarks"}), 400
+
+        descriptions = [
+            f"{b['titulo']}: {b['descricao']}" if b['descricao'] else b['titulo']
+            for b in bookmarks
+        ]
+
         existing_titles = {b["titulo"].lower() for b in bookmarks}
         existing_urls = {b["url"].lower() for b in bookmarks}
-        descriptions = [b["descricao"] for b in bookmarks if b["descricao"]]
 
-        if not descriptions:
-            return jsonify({"erro": "No descriptions available"}), 400
+        possiveis_sugestoes = [
+            {"title": "DeepSeek", "url": "https://www.deepseek.com", "description": "Ferramenta de IA para pesquisa avançada"},
+            {"title": "Shein", "url": "https://www.shein.com", "description": "Loja online com moda acessível"},
+            {"title": "Claude", "url": "https://claude.ai", "description": "IA conversacional alternativa ao ChatGPT"},
+            {"title": "Temu", "url": "https://www.temu.com", "description": "Marketplace global de ofertas"},
+            {"title": "Perplexity AI", "url": "https://www.perplexity.ai", "description": "Buscador com IA e fontes citadas"},
+        ]
 
-        MAX_ATTEMPTS = 3
-        for _ in range(MAX_ATTEMPTS):
-            prompt = (
-                "Based on the following bookmark descriptions, suggest ONE new useful bookmark.\n"
-                "Return it in the format: Title;URL;Description (all in one line).\n"
-                "Do NOT repeat any existing titles or URLs. Do NOT add explanations.\n\n"
-                "Descriptions:\n" + "\n".join(f"- {d.strip()}" for d in descriptions)
-            )
+        # Similaridade com SentenceTransformers
+        from sentence_transformers import SentenceTransformer, util
+        model = SentenceTransformer("all-MiniLM-L6-v2")
 
-            response = co.generate(prompt=prompt, max_tokens=100)
-            text = response.generations[0].text.strip()
-            print("[DEBUG] Cohere output:\n", text)
+        user_embeds = model.encode(descriptions, convert_to_tensor=True)
+        sugestao_embeds = model.encode(
+            [s["description"] for s in possiveis_sugestoes], convert_to_tensor=True
+        )
 
-            parts = text.split(";")
-            if len(parts) != 3:
-                continue
+        scores = util.cos_sim(user_embeds, sugestao_embeds).mean(dim=0)
+        melhor_idx = scores.argmax().item()
+        melhor_sugestao = possiveis_sugestoes[melhor_idx]
 
-            title, url, description = [p.strip() for p in parts]
+        if (
+            melhor_sugestao["title"].lower() in existing_titles
+            or melhor_sugestao["url"].lower() in existing_urls
+        ):
+            return jsonify({"erro": "Nenhuma sugestão nova disponível"}), 400
 
-            if title.lower() in existing_titles or url.lower() in existing_urls:
-                continue
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO bookmarks (user_id, titulo, url, descricao)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id
+            """,
+            (
+                user_id,
+                melhor_sugestao["title"],
+                melhor_sugestao["url"],
+                melhor_sugestao["description"],
+            ),
+        )
+        new_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
 
-            conn = get_connection()
-            cur = conn.cursor()
-            cur.execute(
-                "INSERT INTO bookmarks (user_id, titulo, url, descricao) VALUES (%s, %s, %s, %s) RETURNING id",
-                (user_id, title, url, description),
-            )
-            new_id = cur.fetchone()[0]
-            conn.commit()
-            cur.close()
-            conn.close()
-
-            return jsonify({
-                "id": new_id,
-                "title": title,
-                "url": url,
-                "description": description
-            }), 201
-
-        return jsonify({"erro": "All suggestions were duplicates"}), 400
+        return jsonify({
+            "id": new_id,
+            "title": melhor_sugestao["title"],
+            "url": melhor_sugestao["url"],
+            "description": melhor_sugestao["description"]
+        }), 201
 
     except Exception as e:
         print("[ERRO] Sugestão falhou:", e)
