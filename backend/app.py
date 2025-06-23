@@ -1,3 +1,6 @@
+import os
+os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "0" 
+
 from flask import Flask, redirect, url_for, session, request, jsonify
 from flask_dance.contrib.github import make_github_blueprint, github
 from flask_cors import CORS
@@ -5,7 +8,6 @@ from db import get_connection
 from dotenv import load_dotenv
 from urllib.parse import urlencode
 from flask import send_from_directory
-import os
 import bcrypt
 import cohere
 from functools import wraps
@@ -23,7 +25,7 @@ def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static'),
                                'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
-FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://front-web-five.vercel.app")
 
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": [
     "http://localhost:3000",
@@ -49,6 +51,11 @@ def login_required(f):
             return jsonify({"erro": "Usuário não autenticado"}), 401
         return f(*args, **kwargs)
     return decorated_function
+
+@app.route("/login/github")
+def github_login_init():
+    print("[DEBUG] Iniciando login GitHub com redirect_uri:", url_for("github.authorize", _external=True))
+    return redirect(url_for("github.login"))
 
 @app.route("/github")
 def github_login():
