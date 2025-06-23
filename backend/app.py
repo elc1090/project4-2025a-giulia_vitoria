@@ -32,8 +32,9 @@ CORS(app, supports_credentials=True, resources={r"/*": {"origins": [
 ]}})
 
 github_bp = make_github_blueprint(
-    client_id=os.environ.get("GITHUB_CLIENT_ID"),
-    client_secret=os.environ.get("GITHUB_CLIENT_SECRET"),
+    client_id=os.getenv("GITHUB_CLIENT_ID"),
+    client_secret=os.getenv("GITHUB_CLIENT_SECRET"),
+    redirect_url="/login/github/authorized"
 )
 app.register_blueprint(github_bp, url_prefix="/login")
 
