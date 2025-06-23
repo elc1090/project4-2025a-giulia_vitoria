@@ -2,15 +2,12 @@
 
 Uma aplicação fullstack que permite aos usuários cadastrados compartilhar, visualizar, editar e remover seus links favoritos. Os dados são armazenados no servidor e associados a usuários pré-definidos.
 
-![image](https://github.com/user-attachments/assets/6a1438af-1460-4a0f-8f93-c1e66c952607)
-
+![image](https://github.com/user-attachments/assets/a03bed86-6348-4b2d-a830-b148acee11d1)
 
 ## Acesso
 
 - **Frontend:** https://front-web-five.vercel.app/
-- Para acessar, você pode criar um novo usuário, ou fazer login com algum já existente
-- Usuário para teste: vitoria@gmail.com, 1234
-
+  
 ---
 
 ## Plataformas de Hospedagem
@@ -35,7 +32,8 @@ Aplicação web com autenticação simplificada que oferece:
 - CRUD para os links favoritos do usuário
 - CRUD para as pastas do usuário  
 - Interface intuitiva com foco em usabilidade
-- IA que sugere links de acordo com os já existentes do usuário
+- IA que sugere links de acordo com os já existentes 
+- Login federado com GitHub
 
 ---
 
@@ -48,10 +46,9 @@ Etapas principais do projeto:
 3. Criação do backend em Python (Flask)  
 4. Integração com banco de dados PostgreSQL (Neon.tech)  
 5. Implementação do CRUD completo  
-6. Login com usuários pré-cadastrados  
-7. Deploy gratuito (Vercel + Render + Neon.tech)
-8. Implementação de cadastro a partir de alguma plataforma (Google, GitHub, etc)
-9. IA como serviço
+6. Deploy gratuito (Vercel + Render + Neon.tech)
+7. Implementação de cadastro com GitHub
+8. IA como serviço de sugestão de links
 
 ---
 
