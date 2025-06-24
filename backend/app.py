@@ -399,13 +399,13 @@ def suggest_bookmark():
             context_lines.append(line)
 
         prompt = (
-            "Based on the user's saved bookmarks below, suggest ONE new bookmark that aligns with the existing themes.\n"
-            "Response format: Title;URL;Description\n"
-            "Do not repeat any existing titles or URLs.\n"
-            "Only provide the suggestion, no explanations.\n\n"
-            "User's bookmarks:\n" +
+            "Com base nos links salvos pelo usuário abaixo, sugira UM novo bookmark que faça sentido com os temas presentes.\n"
+            "Formato da resposta: Título;URL;Descrição\n"
+            "Não repita nenhum título ou link já existente.\n"
+            "Apenas dê a sugestão, sem explicações.\n\n"
+            "Bookmarks do usuário:\n" +
             "\n".join(f"- {line}" for line in context_lines) +
-            "\n\nSuggestion:"
+            "\n\nSugestão:"
         )
         
 
